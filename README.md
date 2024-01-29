@@ -1,5 +1,6 @@
 # arpg-map-gen
-Rust arpg procedural map generation
+- Rust arpg procedural map generation
+- Each pixel is a game tile
 
 Example outputs
 
