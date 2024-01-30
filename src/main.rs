@@ -126,31 +126,8 @@ fn main() {
 
         generation_area_size: (700, 700),
     };
-    // Biome {
-    //     name: String::from("Ledge2"),
-    //     // odds: 1.0,
-    //     oob_type: TileType::Wall,
-    //     rng_range_multiplicator_rectangle_size: (0.01, 0.020),
-    //     rng_range_number_of_direction_changes: (20, 30),
-    //     rng_range_direction_repeat: (10, 15),
-    //     allowed_directions: vec![(1, -1), (0, 1), (0, -1)],
-    //     generation_init_center: (750, 750),
-    //     generation_area_size: (700, 700),
-    // },
 
-    // let mut biome2 = biomes.to_vec();
-    // let mut handlers = Vec::new();
-    // while let Some(biome) = biome2.pop() {
-    //     biome3 = biomes.to_vec();
-    //     handlers.push(thread::spawn(move || {
-    //         generate_map(seed, &biome, biomes.to_vec());
-    //     }));
-    // }
-    // for handler in handlers {
-    //     handler.join().unwrap();
-    // }
-
-    let maps: Vec<Map> = vec![
+    let mut maps: Vec<Map> = vec![
         Map {
             name: String::from("Island"),
             oob_type: TileType::Water,
@@ -174,7 +151,7 @@ fn main() {
                 large_all_dir.clone(),
                 large_all_dir.clone(),
             ],
-            generation_init_center: (750, 750),
+            generation_init_center: (100, 100),
         },
         Map {
             name: String::from("Forest"),
@@ -199,8 +176,17 @@ fn main() {
         },
     ];
 
-    for map in maps {
-        generate_map(seed, map);
+    // for map in maps {
+    //     generate_map(seed, map);
+    // }
+    let mut handlers = Vec::new();
+    while let Some(map) = maps.pop() {
+        handlers.push(thread::spawn(move || {
+            generate_map(seed, map);
+        }));
+    }
+    for handler in handlers {
+        handler.join().unwrap();
     }
 }
 
