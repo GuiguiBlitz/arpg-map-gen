@@ -26,7 +26,6 @@ struct FloorPattern {
     rng_range_number_of_direction_changes: (i32, i32),
     rng_range_direction_repeat: (i32, i32),
     allowed_directions: Vec<(i32, i32)>,
-    generation_init_center: (i32, i32),
     generation_area_size: (i32, i32),
 }
 #[derive(PartialEq, Eq)]
@@ -38,6 +37,7 @@ struct Map {
     name: String,
     oob_type: TileType,
     biomes: Vec<FloorPattern>,
+    generation_init_center: (i32, i32),
 }
 // const DIRECTIONS_OUTDOOR: [(i32, i32); 8] = [
 //     (0, -1), // ↑
@@ -79,20 +79,16 @@ fn main() {
             (-1, 1),
             (1, 1),
         ],
-        generation_init_center: (750, 750),
         generation_area_size: (700, 700),
     };
     let small_cross_dir = FloorPattern {
-        // odds: 1.0,
         rng_range_multiplicator_rectangle_size: (0.02, 0.06),
         rng_range_number_of_direction_changes: (20, 30),
         rng_range_direction_repeat: (5, 10),
         allowed_directions: vec![(0, -1), (0, 1), (-1, 0), (1, 0)],
-        generation_init_center: (750, 750),
         generation_area_size: (700, 700),
     };
     let small_all_dir = FloorPattern {
-        // odds: 1.0,
         rng_range_multiplicator_rectangle_size: (0.02, 0.04),
         rng_range_number_of_direction_changes: (15, 25),
         rng_range_direction_repeat: (10, 15),
@@ -106,34 +102,28 @@ fn main() {
             (-1, 1),
             (-1, -1),
         ],
-        generation_init_center: (750, 750),
         generation_area_size: (700, 700),
     };
     let many_tiny_all_dir = FloorPattern {
-        // odds: 1.0,
         rng_range_multiplicator_rectangle_size: (0.01, 0.020),
         rng_range_number_of_direction_changes: (30, 40),
         rng_range_direction_repeat: (10, 15),
         allowed_directions: vec![(1, -1), (1, 1), (-1, 1), (-1, -1)],
-        generation_init_center: (750, 750),
         generation_area_size: (700, 700),
     };
     let long_path_bottom_right_dir = FloorPattern {
-        // odds: 1.0,
         rng_range_multiplicator_rectangle_size: (0.01, 0.020),
         rng_range_number_of_direction_changes: (20, 30),
         rng_range_direction_repeat: (10, 15),
         allowed_directions: vec![(1, -1), (1, 1), (-1, 1)],
-        generation_init_center: (750, 750),
         generation_area_size: (700, 700),
     };
     let short_path_bottom_right_dir = FloorPattern {
-        // odds: 1.0,
         rng_range_multiplicator_rectangle_size: (0.01, 0.020),
         rng_range_number_of_direction_changes: (10, 15),
         rng_range_direction_repeat: (5, 8),
         allowed_directions: vec![(1, -1), (1, 1), (-1, 1)],
-        generation_init_center: (750, 750),
+
         generation_area_size: (700, 700),
     };
     // Biome {
@@ -165,6 +155,7 @@ fn main() {
             name: String::from("Island"),
             oob_type: TileType::Water,
             biomes: vec![many_tiny_all_dir.clone(), small_all_dir.clone()],
+            generation_init_center: (750, 750),
         },
         Map {
             name: String::from("Ledge"),
@@ -173,6 +164,7 @@ fn main() {
                 long_path_bottom_right_dir.clone(),
                 long_path_bottom_right_dir.clone(),
             ],
+            generation_init_center: (100, 100),
         },
         Map {
             name: String::from("Desert"),
@@ -182,6 +174,7 @@ fn main() {
                 large_all_dir.clone(),
                 large_all_dir.clone(),
             ],
+            generation_init_center: (750, 750),
         },
         Map {
             name: String::from("Forest"),
@@ -191,6 +184,7 @@ fn main() {
                 small_cross_dir.clone(),
                 small_cross_dir.clone(),
             ],
+            generation_init_center: (750, 750),
         },
         Map {
             name: String::from("Quarry"),
@@ -201,6 +195,7 @@ fn main() {
                 many_tiny_all_dir.clone(),
                 short_path_bottom_right_dir.clone(),
             ],
+            generation_init_center: (750, 750),
         },
     ];
 
@@ -222,7 +217,7 @@ fn generate_map(seed: u64, map: Map) {
     let mut grid: Grid = init_grid(1500, 1500, oob_tiletype);
 
     // genrate walkable paths based on a random selection of possible biomes
-    let mut center = map.biomes[0].generation_init_center;
+    let mut center = map.generation_init_center;
     for i in 0..map.biomes.len() {
         center =
             generate_walkable_layout(&mut grid, &map.biomes[i], &mut rng, oob_tiletype, center);
@@ -233,20 +228,13 @@ fn generate_map(seed: u64, map: Map) {
     remove_small_cluster(&mut grid, oob_tiletype, 10, true, false);
     remove_small_cluster(&mut grid, oob_tiletype, 10, false, true);
 
-    // add_tile(
-    //     &mut grid,
-    //     rng.gen_range(0..width) as usize,
-    //     rng.gen_range(0..height) as usize,
-    //     TileType::Start,
-    // );
-    // add_tile(
-    //     &mut grid,
-    //     rng.gen_range(0..width) as usize,
-    //     rng.gen_range(0..height) as usize,
-    //     TileType::Boss,
-    // );
-    // Remove orphan non walkable tiles, based on a threashold of x tiles
-    // TODO
+    //TODO
+    // Centering and cropping maps, retry if oob
+
+    // add a map attribute bool, to remove or not the "inside shapes"
+    // start by flagging all
+
+    // Convert generated tile map oob to largest rectangle
 
     // print grid
     render_grid(&grid, map.name.clone());
