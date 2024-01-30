@@ -15,3 +15,7 @@ An island
 A quary ledge
 
 ![Ledge](output/Ledge.png)
+
+A desert
+
+![Desert](output/Desert.png)
