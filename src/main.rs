@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use std::{thread, vec};
 
 // RNG
@@ -5,6 +6,7 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 // Image creation
 use image::ImageBuffer;
+
 type Grid = Vec<Vec<Tile>>;
 #[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -17,7 +19,7 @@ enum TileType {
     Water,
     Forest,
 }
-
+#[derive(Clone)]
 struct Biome {
     name: String,
     // odds: f32,
@@ -44,12 +46,12 @@ struct Tile {
 //     (1, 1),
 // ];
 
-// const DIRECTIONS_INTDOOR: [(i32, i32); 4] = [
-//     (0, -1), // ↑
-//     (0, 1),  // ↓
-//     (-1, 0), // ←
-//     (1, 0),  // →
-// ];
+const DIRECTIONS_INTDOOR: [(i32, i32); 4] = [
+    (0, -1), // ↑
+    (0, 1),  // ↓
+    (-1, 0), // ←
+    (1, 0),  // →
+];
 
 fn main() {
     // Create random generator from seed
@@ -76,8 +78,8 @@ fn main() {
                 (-1, 1),
                 (1, 1),
             ],
-            generation_init_center: (500, 500),
-            generation_area_size: (1000, 1000),
+            generation_init_center: (350, 350),
+            generation_area_size: (700, 700),
         },
         Biome {
             name: String::from("Forest"),
@@ -87,8 +89,8 @@ fn main() {
             rng_range_number_of_direction_changes: (20, 30),
             rng_range_direction_repeat: (5, 10),
             allowed_directions: vec![(0, -1), (0, 1), (-1, 0), (1, 0)],
-            generation_init_center: (400, 400),
-            generation_area_size: (800, 800),
+            generation_init_center: (350, 350),
+            generation_area_size: (700, 700),
         },
         Biome {
             name: String::from("Island"),
@@ -107,8 +109,8 @@ fn main() {
                 (-1, 1),
                 (-1, -1),
             ],
-            generation_init_center: (400, 400),
-            generation_area_size: (800, 800),
+            generation_init_center: (350, 350),
+            generation_area_size: (700, 700),
         },
         Biome {
             name: String::from("Quarry"),
@@ -118,8 +120,8 @@ fn main() {
             rng_range_number_of_direction_changes: (30, 40),
             rng_range_direction_repeat: (10, 15),
             allowed_directions: vec![(1, -1), (1, 1), (-1, 1), (-1, -1)],
-            generation_init_center: (400, 400),
-            generation_area_size: (800, 800),
+            generation_init_center: (350, 350),
+            generation_area_size: (700, 700),
         },
         Biome {
             name: String::from("Ledge"),
@@ -129,56 +131,55 @@ fn main() {
             rng_range_number_of_direction_changes: (20, 30),
             rng_range_direction_repeat: (10, 15),
             allowed_directions: vec![(1, -1), (1, 1), (-1, 1)],
-            generation_init_center: (100, 100),
-            generation_area_size: (800, 800),
-        },
-        Biome {
-            name: String::from("Superu"),
-            // odds: 1.0,
-            oob_type: TileType::Wall,
-            rng_range_multiplicator_rectangle_size: (0.01, 0.020),
-            rng_range_number_of_direction_changes: (1, 2),
-            rng_range_direction_repeat: (40, 65),
-            allowed_directions: vec![(0, -1), (1, 0)],
-            generation_init_center: (400, 400),
-            generation_area_size: (800, 800),
+            generation_init_center: (50, 50),
+            generation_area_size: (700, 700),
         },
     ];
-
+    // let mut biome2 = biomes.to_vec();
     // let mut handlers = Vec::new();
-    // while let Some(biome) = biomes.pop() {
+    // while let Some(biome) = biome2.pop() {
+    //     biome3 = biomes.to_vec();
     //     handlers.push(thread::spawn(move || {
-    //         generate_map(seed, &biome);
+    //         generate_map(seed, &biome, biomes.to_vec());
     //     }));
     // }
     // for handler in handlers {
     //     handler.join().unwrap();
     // }
-    for biome in biomes {
-        generate_map(seed, &biome);
+    for i in 0..biomes.len() {
+        generate_map(seed, &biomes[i], biomes.to_vec());
     }
 }
 
-fn generate_map(seed: u64, biome: &Biome) {
-    println!("-----For Biome {}", biome.name);
+fn generate_map(seed: u64, init_biome: &Biome, biomes: Vec<Biome>) {
+    // The rng instance is created from the seed
     let mut rng: ChaCha8Rng = ChaCha8Rng::seed_from_u64(seed);
 
-    // let test: f32 = f32::sin(4.0);
-    // println!("Sin is {}", test);
+    // Roll initial biome, which defines the out of bound tile type
+    // let biome = biomes[rng.gen_range(0..biomes.len())];
+    println!("-----For Biome {}", init_biome.name);
+    let oob_tiletype = init_biome.oob_type;
 
-    // Init grid
+    // Initialize map grid from initial biome and oob tile type
     let mut grid: Grid = init_grid(
-        biome.generation_area_size.0,
-        biome.generation_area_size.1,
-        biome.oob_type,
+        init_biome.generation_area_size.0,
+        init_biome.generation_area_size.1,
+        oob_tiletype,
     );
 
-    // remplir de watter ou wall
-    // Pause une grosse forme, square only
-    // partir d'un point qui touche le side ( ou un des neighbor est de l'eau ou du wall)
-    // On joue sur le nombre, la tailler et le type de formes most likely, les range sont definis par les biomes.
-    // Definir des suite de dirrection predefinies, genre left right up down, ou full droite
-    generate_walkable_layout(&mut grid, biome, &mut rng);
+    // genrate walkable paths based on a random selection of possible biomes
+    let mut biome = init_biome;
+    let mut center = init_biome.generation_init_center;
+    for _ in 0..3 {
+        center = generate_walkable_layout(&mut grid, biome, &mut rng, oob_tiletype, center);
+        biome = &biomes[rng.gen_range(0..biomes.len())];
+    }
+
+    // remove small clusters of oob tiles
+    remove_small_cluster(&mut grid, oob_tiletype, 10, false, true);
+    remove_small_cluster(&mut grid, oob_tiletype, 10, true, false);
+    remove_small_cluster(&mut grid, oob_tiletype, 10, false, true);
+
     // add_tile(
     //     &mut grid,
     //     rng.gen_range(0..width) as usize,
@@ -195,17 +196,108 @@ fn generate_map(seed: u64, biome: &Biome) {
     // TODO
 
     // print grid
-    render_grid(&grid, biome.name.clone());
+    render_grid(&grid, init_biome.name.clone());
 }
 
-fn generate_walkable_layout(grid: &mut Grid, biome: &Biome, rng: &mut ChaCha8Rng) {
-    // input on definie si c'est de l'eau ou du mur en dehors
-    // on fait des appels successifs a draw rectangle
-    // definir l'impact des weight sur la generation ici
-    // on posse une tile initiale, puis on choisis un edge a un non walkable, on roll la taille du rectangle un offset du centre, et on draw le rectangle
+fn remove_small_cluster(
+    grid: &mut Grid,
+    oob_tiletype: TileType,
+    cluster_size: usize,
+    check_x: bool,
+    check_y: bool,
+) {
+    let mut tiles_to_fill = Vec::new();
+    // for all tiles
+    for x in 0..grid.len() {
+        for y in 0..grid[0].len() {
+            // if we are on a oob tile type
+            if grid[x][y].tile_type == oob_tiletype
+                && (x + cluster_size) < grid.len()
+                && (x as i32 - cluster_size as i32) > 0
+                && (y + cluster_size) < grid[0].len()
+                && (y as i32 - cluster_size as i32) > 0
+            {
+                // check in each direction if there is a walkable tile next to it
+                let mut is_floor_up: bool = false;
+                let mut is_floor_bottom: bool = false;
+                let mut is_floor_left: bool = false;
+                let mut is_floor_right: bool = false;
+                let mut floor_up_at = 0;
+                let mut floor_bottom_at = 0;
+                let mut floor_left_at = 0;
+                let mut floor_right_at = 0;
+                for i in 1..cluster_size {
+                    if grid[x + i][y].tile_type == TileType::Floor {
+                        is_floor_right = true;
+                        floor_right_at = i;
+                    }
+                    if grid[x - i][y].tile_type == TileType::Floor {
+                        is_floor_left = true;
+                        floor_left_at = i;
+                    }
+                    if grid[x][y + i].tile_type == TileType::Floor {
+                        is_floor_bottom = true;
+                        floor_bottom_at = i;
+                    }
+                    if grid[x][y - i].tile_type == TileType::Floor {
+                        is_floor_up = true;
+                        floor_up_at = i;
+                    }
+                }
+                if check_x && check_y {
+                    if is_floor_right && is_floor_left && is_floor_bottom && is_floor_up {
+                        for i in 1..floor_bottom_at {
+                            tiles_to_fill.push((x, y + i));
+                        }
+                        for i in 1..floor_up_at {
+                            tiles_to_fill.push((x, y - i));
+                        }
+                        for i in 1..floor_left_at {
+                            tiles_to_fill.push((x - i, y));
+                        }
+                        for i in 1..floor_right_at {
+                            tiles_to_fill.push((x + i, y));
+                        }
+                        tiles_to_fill.push((x, y));
+                    }
+                } else {
+                    if (check_x) && is_floor_right && is_floor_left {
+                        for i in 1..floor_left_at {
+                            tiles_to_fill.push((x - i, y));
+                        }
+                        for i in 1..floor_right_at {
+                            tiles_to_fill.push((x + i, y));
+                        }
+                        tiles_to_fill.push((x, y));
+                    }
+
+                    if (check_y) && is_floor_bottom && is_floor_up {
+                        for i in 1..floor_bottom_at {
+                            tiles_to_fill.push((x, y + i));
+                        }
+                        for i in 1..floor_up_at {
+                            tiles_to_fill.push((x, y - i));
+                        }
+                        tiles_to_fill.push((x, y));
+                    }
+                }
+            }
+        }
+    }
+
+    for tile in tiles_to_fill {
+        add_tile(grid, tile.0, tile.1, TileType::Floor);
+    }
+}
+fn generate_walkable_layout(
+    grid: &mut Grid,
+    biome: &Biome,
+    rng: &mut ChaCha8Rng,
+    oob_tiletype: TileType,
+    start_center: (i32, i32),
+) -> (i32, i32) {
     let gridsize = grid.len() as i32;
-    let init_center = biome.generation_init_center;
-    // on fait le premier rectengle au centre
+
     draw_rectangle(
         grid,
         TileType::Floor,
@@ -223,17 +315,14 @@ fn generate_walkable_layout(grid: &mut Grid, biome: &Biome, rng: &mut ChaCha8Rng
                 ))
             .round() as i32,
         ),
-        init_center,
+        start_center,
     );
 
-    let mut center: (i32, i32) = init_center;
+    let mut center: (i32, i32) = start_center;
     for _ in 0..rng.gen_range(
         biome.rng_range_number_of_direction_changes.0
             ..biome.rng_range_number_of_direction_changes.1,
     ) {
-        // on cherche un nouveau centre , depuis la position du precedent, avec une range maximum et un angle de recherche
-        // on pause des point au hazard dans la zone possible jusq'a tomber sur du sol
-        // quand on touche le sol, on cherge un edge sur une dirrection ( direction est haut bas gauche ou droite, on pouras donner des poids a chaque via le biome)
         let iterrations: i32 =
             rng.gen_range(biome.rng_range_direction_repeat.0..biome.rng_range_direction_repeat.1);
 
@@ -241,7 +330,7 @@ fn generate_walkable_layout(grid: &mut Grid, biome: &Biome, rng: &mut ChaCha8Rng
             let direction: (i32, i32) =
                 biome.allowed_directions[rng.gen_range(0..biome.allowed_directions.len())];
 
-            center = find_point_on_edge(grid, center, biome, direction);
+            center = find_point_on_edge(grid, center, oob_tiletype, direction);
             draw_rectangle(
                 grid,
                 TileType::Floor,
@@ -263,12 +352,13 @@ fn generate_walkable_layout(grid: &mut Grid, biome: &Biome, rng: &mut ChaCha8Rng
             );
         }
     }
+    center
 }
 
 fn find_point_on_edge(
     grid: &Grid,
     previous_center: (i32, i32),
-    biome: &Biome,
+    oob_tiletype: TileType,
     direction: (i32, i32),
 ) -> (i32, i32) {
     let mut current_position = previous_center;
@@ -279,7 +369,7 @@ fn find_point_on_edge(
         && grid[(current_position.0 + direction.0) as usize]
             [(current_position.1 + direction.1) as usize]
             .tile_type
-            != biome.oob_type
+            != oob_tiletype
     {
         current_position = (
             (current_position.0 + direction.0),
