@@ -50,12 +50,12 @@ struct Map {
 //     (1, 1),
 // ];
 
-// const DIRECTIONS_INTDOOR: [(i32, i32); 4] = [
-//     (0, -1), // ↑
-//     (0, 1),  // ↓
-//     (-1, 0), // ←
-//     (1, 0),  // →
-// ];
+const DIRECTIONS4: [(i32, i32); 4] = [
+    (0, -1), // ↑
+    (0, 1),  // ↓
+    (-1, 0), // ←
+    (1, 0),  // →
+];
 
 fn main() {
     // Create random generator from seed
@@ -64,6 +64,10 @@ fn main() {
     // random seed
     let seed: u64 = rand::random();
     println!("New seed is {}", seed);
+
+    //------------------------------------------------------//
+    //                Define all Floor Patterns             //
+    //------------------------------------------------------//
     let large_all_dir = FloorPattern {
         // odds: 1.0,
         rng_range_multiplicator_rectangle_size: (0.1, 0.15),
@@ -126,7 +130,9 @@ fn main() {
 
         generation_area_size: (700, 700),
     };
-
+    //------------------------------------------------------//
+    //                Define Maps Content                   //
+    //------------------------------------------------------//
     let mut maps: Vec<Map> = vec![
         Map {
             name: String::from("Island"),
@@ -148,6 +154,7 @@ fn main() {
             oob_type: TileType::Wall,
             biomes: vec![
                 long_path_bottom_right_dir.clone(),
+                large_all_dir.clone(),
                 large_all_dir.clone(),
                 large_all_dir.clone(),
             ],
@@ -175,6 +182,9 @@ fn main() {
             generation_init_center: (750, 750),
         },
     ];
+    //------------------------------------------------------//
+    //               Generate maps                          //
+    //------------------------------------------------------//
 
     // for map in maps {
     //     generate_map(seed, map);
@@ -204,26 +214,90 @@ fn generate_map(seed: u64, map: Map) {
 
     // genrate walkable paths based on a random selection of possible biomes
     let mut center = map.generation_init_center;
+    let map_start = center;
+
     for i in 0..map.biomes.len() {
         center =
             generate_walkable_layout(&mut grid, &map.biomes[i], &mut rng, oob_tiletype, center);
     }
+
+    //TODO
+    // Centering and cropping maps, retry if oob
 
     // remove small clusters of oob tiles
     remove_small_cluster(&mut grid, oob_tiletype, 10, false, true);
     remove_small_cluster(&mut grid, oob_tiletype, 10, true, false);
     remove_small_cluster(&mut grid, oob_tiletype, 10, false, true);
 
-    //TODO
-    // Centering and cropping maps, retry if oob
+    // TODO
+    // add Start of map, first center and last center
+    draw_rectangle(&mut grid, TileType::Start, (5, 5), map_start);
+    draw_rectangle(&mut grid, TileType::Boss, (5, 5), center);
 
+    // TODO
     // add a map attribute bool, to remove or not the "inside shapes"
     // start by flagging all
-
     // Convert generated tile map oob to largest rectangle
 
+    resize_grid(&mut grid);
     // print grid
     render_grid(&grid, map.name.clone());
+}
+
+fn resize_grid(grid: &mut Grid) {
+    // for each direction
+    // left to right
+    let height = grid[0].len();
+    'outer: loop {
+        for y in 0..height {
+            if grid[25][y].tile_type == TileType::Floor {
+                break 'outer;
+            }
+        }
+        grid.remove(0);
+    }
+    //right to left
+    let mut x = grid.len() - 1;
+
+    'outer: loop {
+        for y in 0..height {
+            if grid[x - 25][y].tile_type == TileType::Floor {
+                break 'outer;
+            }
+        }
+        x -= 1;
+    }
+    grid.truncate(x);
+    // bottom to up
+    let mut y = 0;
+    let width = grid.len();
+    'outer: loop {
+        for x in 0..width {
+            if grid[x][y + 25].tile_type == TileType::Floor {
+                break 'outer;
+            }
+        }
+        y += 1;
+    }
+    for x in 0..width {
+        for _ in 0..y {
+            grid[x].remove(0);
+        }
+    }
+    // Top to bottom
+    y = grid[0].len() - 1;
+
+    'outer: loop {
+        for x in 0..width {
+            if grid[x][y - 25].tile_type == TileType::Floor {
+                break 'outer;
+            }
+        }
+        y -= 1;
+    }
+    for x in 0..width {
+        grid[x].truncate(y);
+    }
 }
 
 fn remove_small_cluster(
@@ -311,7 +385,7 @@ fn remove_small_cluster(
             }
         }
     }
-
+    // after full scan, update tileset
     for tile in tiles_to_fill {
         add_tile(grid, tile.0, tile.1, TileType::Floor);
     }
@@ -497,7 +571,7 @@ fn render_grid(grid: &Grid, file_name: String) {
                 i.try_into().unwrap(),
                 j.try_into().unwrap(),
                 match y.tile_type {
-                    TileType::Boss => image::Rgb([181u8, 181u8, 181u8]),
+                    TileType::Boss => image::Rgb([0u8, 0u8, 0u8]),
                     TileType::Floor => image::Rgb([230u8, 213u8, 168u8]),
                     TileType::Wall => image::Rgb([122u8, 97u8, 31u8]),
                     TileType::Start => image::Rgb([182u8, 51u8, 214u8]),
