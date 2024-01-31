@@ -70,7 +70,7 @@ fn main() {
     //------------------------------------------------------//
     let large_all_dir = FloorPattern {
         // odds: 1.0,
-        rng_range_multiplicator_rectangle_size: (0.08, 0.11),
+        rng_range_multiplicator_rectangle_size: (0.1, 0.2),
         rng_range_number_of_direction_changes: (4, 5),
         rng_range_direction_repeat: (1, 3),
         allowed_directions: vec![
@@ -83,7 +83,7 @@ fn main() {
             (-1, 1),
             (1, 1),
         ],
-        generation_area_size: (700, 700),
+        generation_area_size: (230, 230),
     };
     let small_cross_dir = FloorPattern {
         rng_range_multiplicator_rectangle_size: (0.02, 0.06),
@@ -152,12 +152,8 @@ fn main() {
         Map {
             name: String::from("Desert"),
             oob_type: TileType::Wall,
-            biomes: vec![
-                long_path_bottom_right_dir.clone(),
-                large_all_dir.clone(),
-                large_all_dir.clone(),
-            ],
-            generation_init_center: (100, 100),
+            biomes: vec![long_path_bottom_right_dir.clone(), large_all_dir.clone()],
+            generation_init_center: (150, 150),
         },
         Map {
             name: String::from("Forest"),
@@ -237,8 +233,9 @@ fn generate_map(seed: u64, map: Map) {
     // add a map attribute bool, to remove or not the "inside shapes"
     // start by flagging all
     // Convert generated tile map oob to largest rectangle
-
+    // render_grid(&grid, map.name.clone() + "_before");
     resize_grid(&mut grid, 4);
+
     println!(
         "final size for {} is {} {}",
         map.name,
