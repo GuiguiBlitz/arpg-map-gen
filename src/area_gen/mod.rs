@@ -36,12 +36,22 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     let map = maps.remove(map_index);
     let map_name = map.name.clone();
     // Generate map grid
-    let grid = generate_map(seed, map);
+    let mut grid = generate_map(seed, map);
 
+    //------------------------------------------------------//
+    //               Find oob polygons                      //
+    //------------------------------------------------------//
+    // polygone grid display for debuging
+    // Find a first point on the map contour
+    let mut current_pos = (0, (grid[0].len() / 2) as i32);
+    while grid[current_pos.0 as usize][current_pos.1 as usize].tile_type != TileType::Floor {
+        current_pos.0 += 1;
+    }
+    // Take a step
+    current_pos.0 -= 1;
     // Generate polygone of the outside of the map
-
-    let oob_polygone = find_oob_polygone(&grid);
-
+    let oob_polygone = find_oob_polygone(current_pos, &mut grid);
+    render_grid(&grid, map_name.clone());
     // Initiate module output
     let mut walkable_x = Vec::new();
     let mut walkable_y = Vec::new();
@@ -69,17 +79,10 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     }
 }
 
-fn find_oob_polygone(grid: &Grid) -> Vec<(f32, f32)> {
+fn find_oob_polygone(start_point: (i32, i32), grid: &mut Grid) -> Vec<(f32, f32)> {
     let mut tile_polygone = Vec::new();
     let mut px_polygone: Vec<(f32, f32)> = Vec::new();
-    let mut current_pos: (i32, i32) = (0, (grid[0].len() / 2) as i32);
-    // polygone grid display for debuging
-    // Find a first point on the map contour
-    while grid[current_pos.0 as usize][current_pos.1 as usize].tile_type != TileType::Floor {
-        current_pos.0 += 1;
-    }
-    // Take a step
-    current_pos.0 -= 1;
+    let mut current_pos = start_point;
     // We start by trying to go down
     let mut dir = (0, 1);
     let mut next_dir = dir;
@@ -216,6 +219,12 @@ fn find_oob_polygone(grid: &Grid) -> Vec<(f32, f32)> {
         current_pos.0 += dir.0;
         current_pos.1 += dir.1;
     }
+
+    // for debuging only
+    for point in tile_polygone {
+        grid[point.0 as usize][point.1 as usize].tile_type = TileType::Start;
+    }
+
     px_polygone
 }
 
@@ -249,8 +258,8 @@ fn generate_map(seed: u64, map: Map) -> Grid {
     // resize_grid to it's minimum size
     resize_grid(&mut grid, 4);
 
-    // print grid
-    render_grid(&grid, map.name.clone());
+    // // print grid
+    // render_grid(&grid, map.name.clone());
     grid
 }
 
