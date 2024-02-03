@@ -17,7 +17,12 @@ pub struct AreaGenerationOutput {
     pub height: u32,
     pub walkable_x: Vec<u32>,
     pub walkable_y: Vec<u32>,
-    pub oob_polygons: Vec<(Vec<(f32, f32)>, bool)>, // bool is true when outer oob shape, false when inner
+    pub oob_polygons: Vec<Shape>, // bool is true when outer oob shape, false when inner
+}
+
+pub struct Shape {
+    points: Vec<(f32, f32)>,
+    inner_if_true: bool,
 }
 
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
@@ -72,7 +77,7 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     }
 }
 
-fn find_oob_polygons(grid: &mut Grid) -> Vec<(Vec<(f32, f32)>, bool)> {
+fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
     // Find a first point on the map contour
     let mut oob_polygons = Vec::new();
     let mut current_pos = (0, (grid[0].len() / 2) as i32);
@@ -82,7 +87,10 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<(Vec<(f32, f32)>, bool)> {
     // Take a step
     current_pos.0 -= 1;
     // Generate polygone of the outside of the map
-    oob_polygons.push((find_oob_polygone(current_pos, grid), true));
+    oob_polygons.push(Shape {
+        points: find_oob_polygone(current_pos, grid),
+        inner_if_true: true,
+    });
     // find inside map polygones
     // scan the grid and search for tiles that are not floor but next to floor, and not already scanned
     'outer: loop {
@@ -95,7 +103,10 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<(Vec<(f32, f32)>, bool)> {
                         || grid[x][y + 1].tile_type == TileType::Floor
                         || grid[x][y - 1].tile_type == TileType::Floor)
                 {
-                    oob_polygons.push((find_oob_polygone((x as i32, y as i32), grid), false));
+                    oob_polygons.push(Shape {
+                        points: find_oob_polygone((x as i32, y as i32), grid),
+                        inner_if_true: true,
+                    });
                     continue 'outer;
                 }
             }
