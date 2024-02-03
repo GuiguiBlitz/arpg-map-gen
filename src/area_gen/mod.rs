@@ -65,6 +65,7 @@ pub struct AreaGenerationOutput {
     pub height: u32,
     pub walkable_x: Vec<u32>,
     pub walkable_y: Vec<u32>,
+    pub oob_polygon: Vec<(f32, f32)>,
 }
 
 pub fn generate_area() -> AreaGenerationOutput {
@@ -212,7 +213,7 @@ pub fn generate_area() -> AreaGenerationOutput {
 
     // Generate polygone of the outside of the map
 
-    let oob_polygone_tiles = find_oob_polygone(&grid);
+    let oob_polygone = find_oob_polygone(&grid);
 
     // Initiate module output
     let mut walkable_x = Vec::new();
@@ -227,6 +228,7 @@ pub fn generate_area() -> AreaGenerationOutput {
     }
 
     AreaGenerationOutput {
+        oob_polygon: oob_polygone,
         width: grid.len() as u32,
         height: grid[0].len() as u32,
         walkable_x,
@@ -234,125 +236,146 @@ pub fn generate_area() -> AreaGenerationOutput {
     }
 }
 
-fn find_oob_polygone(grid: &Grid) -> Vec<(i32, i32)> {
-    let mut polygone = Vec::new();
+fn find_oob_polygone(grid: &Grid) -> Vec<(f32, f32)> {
+    let mut tile_polygone = Vec::new();
+    let mut px_polygone: Vec<(f32, f32)> = Vec::new();
     let mut current_pos: (i32, i32) = (0, (grid[0].len() / 2) as i32);
-    let down = (0, 1);
-    let up = (0, -1);
-    let left = (-1, 0);
-    let right = (1, 0);
     let mut dir: (i32, i32) = (0, 0);
     // polygone grid display for debuging
-    let mut poly_grid: Grid = init_grid(grid[0].len() as i32, grid.len() as i32, TileType::Floor);
     // Find a first point on the map contour
     while grid[current_pos.0 as usize][current_pos.1 as usize].tile_type != TileType::Floor {
         current_pos.0 += 1;
     }
+    // Take a step
+    current_pos.0 -= 1;
     // We start by trying to go down
     dir = (0, 1);
     let mut next_dir = dir;
-    while !polygone.contains(&current_pos) {
+    // continue tracing until we come back where to the first corner
+    while !tile_polygone.contains(&current_pos) {
         // if current dir is down
         if dir == (0, 1) {
+            // right is floor
             if (grid[current_pos.0 as usize + 1][current_pos.1 as usize]).tile_type
                 == TileType::Floor
             {
+                // down is floor
                 if grid[current_pos.0 as usize][current_pos.1 as usize + 1].tile_type
                     == TileType::Floor
                 {
                     //found corner
-                    polygone.push(current_pos);
-                    poly_grid[current_pos.0 as usize][current_pos.1 as usize].tile_type =
-                        TileType::Wall;
-                    println!("Going left");
+                    tile_polygone.push(current_pos);
+                    //keep bottom right point
+                    px_polygone.push((
+                        (current_pos.0 * TILE_SIZE) as f32,
+                        (current_pos.1 * TILE_SIZE) as f32,
+                    ));
                     next_dir = (-1, 0);
                 } else {
-                    println!("Going down");
                     next_dir = (0, 1);
                 }
             } else {
-                polygone.push(current_pos);
-                poly_grid[current_pos.0 as usize][current_pos.1 as usize].tile_type =
-                    TileType::Wall;
-                println!("Going right");
+                // found corner
+                tile_polygone.push(current_pos);
+                // keep up right point
+                px_polygone.push((
+                    (current_pos.0 * TILE_SIZE) as f32,
+                    ((current_pos.1 * TILE_SIZE) - TILE_SIZE) as f32,
+                ));
                 next_dir = (1, 0);
             }
         }
         // if curent dir is left
         if dir == (-1, 0) {
+            // bottom is floor
             if (grid[current_pos.0 as usize][current_pos.1 as usize + 1]).tile_type
                 == TileType::Floor
             {
+                // left is floor
                 if grid[current_pos.0 as usize - 1][current_pos.1 as usize].tile_type
                     == TileType::Floor
                 {
                     //found corner
-                    polygone.push(current_pos);
-                    poly_grid[current_pos.0 as usize][current_pos.1 as usize].tile_type =
-                        TileType::Wall;
-                    println!("Going up");
+                    tile_polygone.push(current_pos);
+                    //keep bottom left
+                    px_polygone.push((
+                        ((current_pos.0 * TILE_SIZE) - TILE_SIZE) as f32,
+                        (current_pos.1 * TILE_SIZE) as f32,
+                    ));
                     next_dir = (0, -1);
                 } else {
-                    println!("Going left");
                     next_dir = (-1, 0);
                 }
             } else {
-                polygone.push(current_pos);
-                poly_grid[current_pos.0 as usize][current_pos.1 as usize].tile_type =
-                    TileType::Wall;
-                println!("Going down");
+                tile_polygone.push(current_pos);
+                //keep bottom right
+                px_polygone.push((
+                    (current_pos.0 * TILE_SIZE) as f32,
+                    (current_pos.1 * TILE_SIZE) as f32,
+                ));
                 next_dir = (0, 1);
             }
         }
         // if curent dir is right
         if dir == (1, 0) {
+            // up is floor
             if (grid[current_pos.0 as usize][current_pos.1 as usize - 1]).tile_type
                 == TileType::Floor
             {
+                // right is floor
                 if grid[current_pos.0 as usize + 1][current_pos.1 as usize].tile_type
                     == TileType::Floor
                 {
                     //found corner
-                    polygone.push(current_pos);
-                    poly_grid[current_pos.0 as usize][current_pos.1 as usize].tile_type =
-                        TileType::Wall;
-                    println!("Going down");
+                    tile_polygone.push(current_pos);
+                    // keep up right point
+                    px_polygone.push((
+                        (current_pos.0 * TILE_SIZE) as f32,
+                        ((current_pos.1 * TILE_SIZE) - TILE_SIZE) as f32,
+                    ));
                     next_dir = (0, 1);
                 } else {
-                    println!("Going right");
                     next_dir = (1, 0);
                 }
             } else {
-                polygone.push(current_pos);
-                poly_grid[current_pos.0 as usize][current_pos.1 as usize].tile_type =
-                    TileType::Wall;
-                println!("Going up");
+                tile_polygone.push(current_pos);
+                // keep up left point
+                px_polygone.push((
+                    ((current_pos.0 * TILE_SIZE) - TILE_SIZE) as f32,
+                    ((current_pos.1 * TILE_SIZE) - TILE_SIZE) as f32,
+                ));
                 next_dir = (0, -1);
             }
         }
         // if current dir is up
         if dir == (0, -1) {
+            // left is floor
             if (grid[current_pos.0 as usize - 1][current_pos.1 as usize]).tile_type
                 == TileType::Floor
             {
+                // up is floor
                 if grid[current_pos.0 as usize][current_pos.1 as usize - 1].tile_type
                     == TileType::Floor
                 {
                     //found corner
-                    polygone.push(current_pos);
-                    poly_grid[current_pos.0 as usize][current_pos.1 as usize].tile_type =
-                        TileType::Wall;
-                    println!("Going right");
+                    tile_polygone.push(current_pos);
+                    // keep up left point
+                    px_polygone.push((
+                        ((current_pos.0 * TILE_SIZE) - TILE_SIZE) as f32,
+                        ((current_pos.1 * TILE_SIZE) - TILE_SIZE) as f32,
+                    ));
                     next_dir = (1, 0);
                 } else {
-                    println!("Going up");
                     next_dir = (0, -1);
                 }
             } else {
-                polygone.push(current_pos);
-                poly_grid[current_pos.0 as usize][current_pos.1 as usize].tile_type =
-                    TileType::Wall;
-                println!("Going left");
+                // found corner
+                tile_polygone.push(current_pos);
+                // keep bottom left point
+                px_polygone.push((
+                    ((current_pos.0 * TILE_SIZE) - TILE_SIZE) as f32,
+                    (current_pos.1 * TILE_SIZE) as f32,
+                ));
                 next_dir = (-1, 0);
             }
         }
@@ -361,10 +384,7 @@ fn find_oob_polygone(grid: &Grid) -> Vec<(i32, i32)> {
         current_pos.0 += dir.0;
         current_pos.1 += dir.1;
     }
-
-    render_grid(&poly_grid, String::from("polygone"));
-
-    polygone
+    px_polygone
 }
 
 fn generate_map(seed: u64, map: Map) -> Grid {
