@@ -68,7 +68,7 @@ pub struct AreaGenerationOutput {
     pub oob_polygon: Vec<(f32, f32)>,
 }
 
-pub fn generate_area() -> AreaGenerationOutput {
+pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // Create random generator from seed
     // fixed seed
     // let seed: u64 = 142857;
@@ -94,14 +94,14 @@ pub fn generate_area() -> AreaGenerationOutput {
             (-1, 1),
             (1, 1),
         ],
-        generation_area_size: (230, 230),
+        generation_area_size: (345, 345),
     };
     let small_cross_dir = FloorPattern {
         rng_range_multiplicator_rectangle_size: (0.02, 0.06),
         rng_range_number_of_direction_changes: (20, 30),
         rng_range_direction_repeat: (5, 10),
         allowed_directions: vec![(0, -1), (0, 1), (-1, 0), (1, 0)],
-        generation_area_size: (230, 230),
+        generation_area_size: (345, 345),
     };
     let small_all_dir = FloorPattern {
         rng_range_multiplicator_rectangle_size: (0.02, 0.04),
@@ -117,21 +117,21 @@ pub fn generate_area() -> AreaGenerationOutput {
             (-1, 1),
             (-1, -1),
         ],
-        generation_area_size: (230, 230),
+        generation_area_size: (345, 345),
     };
     let many_tiny_all_dir = FloorPattern {
         rng_range_multiplicator_rectangle_size: (0.01, 0.020),
         rng_range_number_of_direction_changes: (30, 40),
         rng_range_direction_repeat: (10, 15),
         allowed_directions: vec![(1, -1), (1, 1), (-1, 1), (-1, -1)],
-        generation_area_size: (230, 230),
+        generation_area_size: (345, 345),
     };
     let long_path_bottom_right_dir = FloorPattern {
         rng_range_multiplicator_rectangle_size: (0.01, 0.020),
         rng_range_number_of_direction_changes: (20, 30),
         rng_range_direction_repeat: (10, 15),
         allowed_directions: vec![(1, -1), (1, 1), (-1, 1)],
-        generation_area_size: (230, 230),
+        generation_area_size: (345, 345),
     };
     let short_path_bottom_right_dir = FloorPattern {
         rng_range_multiplicator_rectangle_size: (0.01, 0.020),
@@ -139,7 +139,7 @@ pub fn generate_area() -> AreaGenerationOutput {
         rng_range_direction_repeat: (5, 8),
         allowed_directions: vec![(1, -1), (1, 1), (-1, 1)],
 
-        generation_area_size: (230, 230),
+        generation_area_size: (345, 345),
     };
     //------------------------------------------------------//
     //                Define Maps Content                   //
@@ -149,7 +149,7 @@ pub fn generate_area() -> AreaGenerationOutput {
             name: String::from("Island"),
             oob_type: TileType::Water,
             biomes: vec![many_tiny_all_dir.clone(), small_all_dir.clone()],
-            generation_init_center: (250, 250),
+            generation_init_center: (375, 375),
         },
         Map {
             name: String::from("Ledge"),
@@ -158,13 +158,13 @@ pub fn generate_area() -> AreaGenerationOutput {
                 long_path_bottom_right_dir.clone(),
                 long_path_bottom_right_dir.clone(),
             ],
-            generation_init_center: (20, 20),
+            generation_init_center: (30, 30),
         },
         Map {
             name: String::from("Desert"),
             oob_type: TileType::Wall,
             biomes: vec![long_path_bottom_right_dir.clone(), large_all_dir.clone()],
-            generation_init_center: (150, 150),
+            generation_init_center: (225, 225),
         },
         Map {
             name: String::from("Forest"),
@@ -174,7 +174,7 @@ pub fn generate_area() -> AreaGenerationOutput {
                 small_cross_dir.clone(),
                 small_cross_dir.clone(),
             ],
-            generation_init_center: (250, 250),
+            generation_init_center: (375, 375),
         },
         Map {
             name: String::from("Quarry"),
@@ -185,7 +185,7 @@ pub fn generate_area() -> AreaGenerationOutput {
                 many_tiny_all_dir.clone(),
                 short_path_bottom_right_dir.clone(),
             ],
-            generation_init_center: (250, 250),
+            generation_init_center: (375, 375),
         },
     ];
     //------------------------------------------------------//
@@ -206,7 +206,7 @@ pub fn generate_area() -> AreaGenerationOutput {
     // }
 
     // Pick a map
-    let map = maps.remove(0);
+    let map = maps.remove(map_index);
 
     // Generate map grid
     let grid = generate_map(seed, map);
@@ -397,7 +397,7 @@ fn generate_map(seed: u64, map: Map) -> Grid {
     let oob_tiletype = map.oob_type;
 
     // Initialize map grid from initial biome and oob tile type
-    let mut grid: Grid = init_grid(500, 500, oob_tiletype);
+    let mut grid: Grid = init_grid(750, 750, oob_tiletype);
 
     // genrate walkable paths based on a random selection of possible biomes
     let mut center = map.generation_init_center;
@@ -409,9 +409,9 @@ fn generate_map(seed: u64, map: Map) -> Grid {
     }
 
     // remove small clusters of oob tiles
-    remove_small_cluster(&mut grid, oob_tiletype, 3, false, true);
-    remove_small_cluster(&mut grid, oob_tiletype, 3, true, false);
-    remove_small_cluster(&mut grid, oob_tiletype, 3, false, true);
+    remove_small_cluster(&mut grid, oob_tiletype, 4, false, true);
+    remove_small_cluster(&mut grid, oob_tiletype, 4, true, false);
+    remove_small_cluster(&mut grid, oob_tiletype, 4, false, true);
 
     // add Start of map, first center and last center
     draw_rectangle(&mut grid, TileType::Start, (2, 2), map_start);
