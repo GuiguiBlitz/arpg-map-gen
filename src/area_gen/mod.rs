@@ -17,7 +17,7 @@ pub struct AreaGenerationOutput {
     pub height: u32,
     pub walkable_x: Vec<u32>,
     pub walkable_y: Vec<u32>,
-    pub oob_polygon: Vec<(f32, f32)>,
+    pub oob_polygon: Vec<Vec<(f32, f32)>>,
 }
 
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
@@ -41,16 +41,7 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     //------------------------------------------------------//
     //               Find oob polygons                      //
     //------------------------------------------------------//
-    // polygone grid display for debuging
-    // Find a first point on the map contour
-    let mut current_pos = (0, (grid[0].len() / 2) as i32);
-    while grid[current_pos.0 as usize][current_pos.1 as usize].tile_type != TileType::Floor {
-        current_pos.0 += 1;
-    }
-    // Take a step
-    current_pos.0 -= 1;
-    // Generate polygone of the outside of the map
-    let oob_polygone = find_oob_polygone(current_pos, &mut grid);
+    let oob_polygones = find_oob_polygones(&mut grid);
     render_grid(&grid, map_name.clone());
     // Initiate module output
     let mut walkable_x = Vec::new();
@@ -71,12 +62,27 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
         grid[0].len()
     );
     AreaGenerationOutput {
-        oob_polygon: oob_polygone,
+        oob_polygon: oob_polygones,
         width: grid.len() as u32,
         height: grid[0].len() as u32,
         walkable_x,
         walkable_y,
     }
+}
+
+fn find_oob_polygones(grid: &mut Grid) -> Vec<Vec<(f32, f32)>> {
+    // Find a first point on the map contour
+    let mut oob_polygones = Vec::new();
+    let mut current_pos = (0, (grid[0].len() / 2) as i32);
+    while grid[current_pos.0 as usize][current_pos.1 as usize].tile_type != TileType::Floor {
+        current_pos.0 += 1;
+    }
+    // Take a step
+    current_pos.0 -= 1;
+    // Generate polygone of the outside of the map
+    oob_polygones.push(find_oob_polygone(current_pos, grid));
+    // find inside map polygones
+    oob_polygones
 }
 
 fn find_oob_polygone(start_point: (i32, i32), grid: &mut Grid) -> Vec<(f32, f32)> {
