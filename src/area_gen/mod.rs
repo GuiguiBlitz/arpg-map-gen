@@ -17,7 +17,7 @@ pub struct AreaGenerationOutput {
     pub height: u32,
     pub walkable_x: Vec<u32>,
     pub walkable_y: Vec<u32>,
-    pub oob_polygon: Vec<Vec<(f32, f32)>>,
+    pub oob_polygons: Vec<Vec<(f32, f32)>>,
 }
 
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
@@ -41,8 +41,10 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     //------------------------------------------------------//
     //               Find oob polygons                      //
     //------------------------------------------------------//
-    let oob_polygones = find_oob_polygones(&mut grid);
-    render_grid(&grid, map_name.clone());
+    let oob_polygons = find_oob_polygons(&mut grid);
+    render_grid(&grid, map_name.clone() + "_outline", true);
+    render_grid(&grid, map_name.clone(), false);
+
     // Initiate module output
     let mut walkable_x = Vec::new();
     let mut walkable_y = Vec::new();
@@ -62,7 +64,7 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
         grid[0].len()
     );
     AreaGenerationOutput {
-        oob_polygon: oob_polygones,
+        oob_polygons,
         width: grid.len() as u32,
         height: grid[0].len() as u32,
         walkable_x,
@@ -70,9 +72,9 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     }
 }
 
-fn find_oob_polygones(grid: &mut Grid) -> Vec<Vec<(f32, f32)>> {
+fn find_oob_polygons(grid: &mut Grid) -> Vec<Vec<(f32, f32)>> {
     // Find a first point on the map contour
-    let mut oob_polygones = Vec::new();
+    let mut oob_polygons = Vec::new();
     let mut current_pos = (0, (grid[0].len() / 2) as i32);
     while grid[current_pos.0 as usize][current_pos.1 as usize].tile_type != TileType::Floor {
         current_pos.0 += 1;
@@ -80,9 +82,28 @@ fn find_oob_polygones(grid: &mut Grid) -> Vec<Vec<(f32, f32)>> {
     // Take a step
     current_pos.0 -= 1;
     // Generate polygone of the outside of the map
-    oob_polygones.push(find_oob_polygone(current_pos, grid));
+    oob_polygons.push(find_oob_polygone(current_pos, grid));
     // find inside map polygones
-    oob_polygones
+    // scan the grid and search for tiles that are not floor but next to floor, and not already scanned
+    'outer: loop {
+        for x in 1..grid.len() - 1 {
+            for y in 1..grid[0].len() - 1 {
+                if !grid[x][y].scanned
+                    && grid[x][y].tile_type != TileType::Floor
+                    && (grid[x + 1][y].tile_type == TileType::Floor
+                        || grid[x - 1][y].tile_type == TileType::Floor
+                        || grid[x][y + 1].tile_type == TileType::Floor
+                        || grid[x][y - 1].tile_type == TileType::Floor)
+                {
+                    find_oob_polygone((x as i32, y as i32), grid);
+                    continue 'outer;
+                }
+            }
+        }
+        break;
+    }
+
+    oob_polygons
 }
 
 fn find_oob_polygone(start_point: (i32, i32), grid: &mut Grid) -> Vec<(f32, f32)> {
@@ -221,7 +242,9 @@ fn find_oob_polygone(start_point: (i32, i32), grid: &mut Grid) -> Vec<(f32, f32)
             }
         }
         dir = next_dir;
-        // if curent dir is right
+        // flag current point to avoid scanning this polygon again later
+        grid[current_pos.0 as usize][current_pos.1 as usize].scanned = true;
+        // move to next point
         current_pos.0 += dir.0;
         current_pos.1 += dir.1;
     }
@@ -575,6 +598,7 @@ fn init_grid(height: i32, width: i32, oob_tiletype: TileType) -> Grid {
         for _ in 0..height {
             row.push(Tile {
                 tile_type: oob_tiletype,
+                scanned: false,
             })
         }
         grid.push(row)
@@ -582,7 +606,7 @@ fn init_grid(height: i32, width: i32, oob_tiletype: TileType) -> Grid {
     grid
 }
 
-fn render_grid(grid: &Grid, file_name: String) {
+fn render_grid(grid: &Grid, file_name: String, show_outline: bool) {
     // Construct a new RGB ImageBuffer with the specified width and height.
     let width = grid.len();
     let height = grid[0].len();
@@ -592,19 +616,27 @@ fn render_grid(grid: &Grid, file_name: String) {
 
     for (i, x) in grid.iter().enumerate() {
         for (j, y) in x.iter().enumerate() {
-            img.put_pixel(
-                i.try_into().unwrap(),
-                j.try_into().unwrap(),
-                match y.tile_type {
-                    TileType::Boss => image::Rgb([0u8, 0u8, 0u8]),
-                    TileType::Floor => image::Rgb([230u8, 213u8, 168u8]),
-                    TileType::Wall => image::Rgb([122u8, 97u8, 31u8]),
-                    TileType::Start => image::Rgb([182u8, 51u8, 214u8]),
-                    TileType::Event => image::Rgb([181u8, 181u8, 181u8]),
-                    TileType::Water => image::Rgb([51u8, 114u8, 214u8]),
-                    TileType::Forest => image::Rgb([42u8, 117u8, 14u8]),
-                },
-            );
+            if y.scanned && show_outline {
+                img.put_pixel(
+                    i.try_into().unwrap(),
+                    j.try_into().unwrap(),
+                    image::Rgb([252u8, 40u8, 40u8]),
+                )
+            } else {
+                img.put_pixel(
+                    i.try_into().unwrap(),
+                    j.try_into().unwrap(),
+                    match y.tile_type {
+                        TileType::Boss => image::Rgb([0u8, 0u8, 0u8]),
+                        TileType::Floor => image::Rgb([230u8, 213u8, 168u8]),
+                        TileType::Wall => image::Rgb([122u8, 97u8, 31u8]),
+                        TileType::Start => image::Rgb([182u8, 51u8, 214u8]),
+                        TileType::Event => image::Rgb([181u8, 181u8, 181u8]),
+                        TileType::Water => image::Rgb([51u8, 114u8, 214u8]),
+                        TileType::Forest => image::Rgb([42u8, 117u8, 14u8]),
+                    },
+                )
+            };
         }
     }
     img.save("output/".to_string() + &file_name + ".png")

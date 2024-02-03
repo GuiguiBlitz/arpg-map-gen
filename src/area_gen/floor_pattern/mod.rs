@@ -22,6 +22,7 @@ pub enum TileType {
 #[derive(PartialEq, Eq)]
 pub struct Tile {
     pub tile_type: TileType,
+    pub scanned: bool,
 }
 
 #[derive(Clone)]
