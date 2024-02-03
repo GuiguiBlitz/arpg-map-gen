@@ -1,62 +1,14 @@
-use std::thread::current;
-#[allow(unused_imports)]
-use std::{thread, vec};
-
+// Custom
+use floor_pattern::{FloorPattern, Map, Tile, TileType};
 // RNG
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 // Image creation
 use image::ImageBuffer;
 
-type Grid = Vec<Vec<Tile>>;
-#[allow(dead_code)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum TileType {
-    Floor,
-    Wall,
-    Start,
-    Boss,
-    Event,
-    Water,
-    Forest,
-}
-#[derive(Clone)]
-struct FloorPattern {
-    // odds: f32,
-    rng_range_multiplicator_rectangle_size: (f32, f32),
-    rng_range_number_of_direction_changes: (i32, i32),
-    rng_range_direction_repeat: (i32, i32),
-    allowed_directions: Vec<(i32, i32)>,
-    generation_area_size: (i32, i32),
-}
-#[derive(PartialEq, Eq)]
-struct Tile {
-    tile_type: TileType,
-}
-#[derive(Clone)]
-struct Map {
-    name: String,
-    oob_type: TileType,
-    biomes: Vec<FloorPattern>,
-    generation_init_center: (i32, i32),
-}
-// const DIRECTIONS_OUTDOOR: [(i32, i32); 8] = [
-//     (0, -1), // ↑
-//     (0, 1),  // ↓
-//     (-1, 0), // ←
-//     (1, 0),  // →
-//     (1, -1),
-//     (1, 1),
-//     (-1, 1),
-//     (1, 1),
-// ];
+mod floor_pattern;
 
-// const DIRECTIONS4: [(i32, i32); 4] = [
-//     (0, -1), // ↑
-//     (0, 1),  // ↓
-//     (-1, 0), // ←
-//     (1, 0),  // →
-// ];
+type Grid = Vec<Vec<Tile>>;
 
 const TILE_SIZE: i32 = 60;
 
@@ -74,140 +26,15 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // let seed: u64 = 142857;
     // random seed
     let seed: u64 = rand::random();
-    println!("New seed is {}", seed);
 
-    //------------------------------------------------------//
-    //                Define all Floor Patterns             //
-    //------------------------------------------------------//
-    let large_all_dir = FloorPattern {
-        // odds: 1.0,
-        rng_range_multiplicator_rectangle_size: (0.1, 0.2),
-        rng_range_number_of_direction_changes: (4, 5),
-        rng_range_direction_repeat: (1, 3),
-        allowed_directions: vec![
-            (0, -1),
-            (0, 1),
-            (-1, 0),
-            (1, 0),
-            (1, -1),
-            (1, 1),
-            (-1, 1),
-            (1, 1),
-        ],
-        generation_area_size: (345, 345),
-    };
-    let small_cross_dir = FloorPattern {
-        rng_range_multiplicator_rectangle_size: (0.02, 0.06),
-        rng_range_number_of_direction_changes: (20, 30),
-        rng_range_direction_repeat: (5, 10),
-        allowed_directions: vec![(0, -1), (0, 1), (-1, 0), (1, 0)],
-        generation_area_size: (345, 345),
-    };
-    let small_all_dir = FloorPattern {
-        rng_range_multiplicator_rectangle_size: (0.02, 0.04),
-        rng_range_number_of_direction_changes: (15, 25),
-        rng_range_direction_repeat: (10, 15),
-        allowed_directions: vec![
-            (0, -1),
-            (0, 1),
-            (-1, 0),
-            (1, 0),
-            (1, -1),
-            (1, 1),
-            (-1, 1),
-            (-1, -1),
-        ],
-        generation_area_size: (345, 345),
-    };
-    let many_tiny_all_dir = FloorPattern {
-        rng_range_multiplicator_rectangle_size: (0.01, 0.020),
-        rng_range_number_of_direction_changes: (30, 40),
-        rng_range_direction_repeat: (10, 15),
-        allowed_directions: vec![(1, -1), (1, 1), (-1, 1), (-1, -1)],
-        generation_area_size: (345, 345),
-    };
-    let long_path_bottom_right_dir = FloorPattern {
-        rng_range_multiplicator_rectangle_size: (0.01, 0.020),
-        rng_range_number_of_direction_changes: (20, 30),
-        rng_range_direction_repeat: (10, 15),
-        allowed_directions: vec![(1, -1), (1, 1), (-1, 1)],
-        generation_area_size: (345, 345),
-    };
-    let short_path_bottom_right_dir = FloorPattern {
-        rng_range_multiplicator_rectangle_size: (0.01, 0.020),
-        rng_range_number_of_direction_changes: (10, 15),
-        rng_range_direction_repeat: (5, 8),
-        allowed_directions: vec![(1, -1), (1, 1), (-1, 1)],
-
-        generation_area_size: (345, 345),
-    };
-    //------------------------------------------------------//
-    //                Define Maps Content                   //
-    //------------------------------------------------------//
-    let mut maps: Vec<Map> = vec![
-        Map {
-            name: String::from("Island"),
-            oob_type: TileType::Water,
-            biomes: vec![many_tiny_all_dir.clone(), small_all_dir.clone()],
-            generation_init_center: (375, 375),
-        },
-        Map {
-            name: String::from("Ledge"),
-            oob_type: TileType::Wall,
-            biomes: vec![
-                long_path_bottom_right_dir.clone(),
-                long_path_bottom_right_dir.clone(),
-            ],
-            generation_init_center: (30, 30),
-        },
-        Map {
-            name: String::from("Desert"),
-            oob_type: TileType::Wall,
-            biomes: vec![long_path_bottom_right_dir.clone(), large_all_dir.clone()],
-            generation_init_center: (225, 225),
-        },
-        Map {
-            name: String::from("Forest"),
-            oob_type: TileType::Forest,
-            biomes: vec![
-                short_path_bottom_right_dir.clone(),
-                small_cross_dir.clone(),
-                small_cross_dir.clone(),
-            ],
-            generation_init_center: (375, 375),
-        },
-        Map {
-            name: String::from("Quarry"),
-            oob_type: TileType::Wall,
-            biomes: vec![
-                short_path_bottom_right_dir.clone(),
-                many_tiny_all_dir.clone(),
-                many_tiny_all_dir.clone(),
-                short_path_bottom_right_dir.clone(),
-            ],
-            generation_init_center: (375, 375),
-        },
-    ];
+    let mut maps = floor_pattern::define_floor_patterns();
     //------------------------------------------------------//
     //               Generate maps                          //
     //------------------------------------------------------//
 
-    // for map in maps {
-    //     generate_map(seed, map);
-    // }
-    // let mut handlers = Vec::new();
-    // while let Some(map) = maps.pop() {
-    //     handlers.push(thread::spawn(move || {
-    //         generate_map(seed, map);
-    //     }));
-    // }
-    // for handler in handlers {
-    //     handler.join().unwrap();
-    // }
-
     // Pick a map
     let map = maps.remove(map_index);
-
+    let map_name = map.name.clone();
     // Generate map grid
     let grid = generate_map(seed, map);
 
@@ -226,7 +53,13 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
             }
         }
     }
-
+    println!(
+        "----------------------------\nSeed : {} \n    Biome : {}\n    Size  : {} x {} tiles",
+        seed,
+        map_name,
+        grid.len(),
+        grid[0].len()
+    );
     AreaGenerationOutput {
         oob_polygon: oob_polygone,
         width: grid.len() as u32,
@@ -240,7 +73,6 @@ fn find_oob_polygone(grid: &Grid) -> Vec<(f32, f32)> {
     let mut tile_polygone = Vec::new();
     let mut px_polygone: Vec<(f32, f32)> = Vec::new();
     let mut current_pos: (i32, i32) = (0, (grid[0].len() / 2) as i32);
-    let mut dir: (i32, i32) = (0, 0);
     // polygone grid display for debuging
     // Find a first point on the map contour
     while grid[current_pos.0 as usize][current_pos.1 as usize].tile_type != TileType::Floor {
@@ -249,7 +81,7 @@ fn find_oob_polygone(grid: &Grid) -> Vec<(f32, f32)> {
     // Take a step
     current_pos.0 -= 1;
     // We start by trying to go down
-    dir = (0, 1);
+    let mut dir = (0, 1);
     let mut next_dir = dir;
     // continue tracing until we come back where to the first corner
     while !tile_polygone.contains(&current_pos) {
@@ -391,9 +223,6 @@ fn generate_map(seed: u64, map: Map) -> Grid {
     // The rng instance is created from the seed
     let mut rng: ChaCha8Rng = ChaCha8Rng::seed_from_u64(seed);
 
-    // Roll initial biome, which defines the out of bound tile type
-    // let biome = biomes[rng.gen_range(0..biomes.len())];
-    println!("-----For Biome {}", map.name);
     let oob_tiletype = map.oob_type;
 
     // Initialize map grid from initial biome and oob tile type
