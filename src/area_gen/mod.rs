@@ -21,8 +21,8 @@ pub struct AreaGenerationOutput {
 }
 
 pub struct Shape {
-    points: Vec<(f32, f32)>,
-    inner_if_true: bool,
+    pub points: Vec<(f32, f32)>,
+    pub inner_if_true: bool,
 }
 
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
