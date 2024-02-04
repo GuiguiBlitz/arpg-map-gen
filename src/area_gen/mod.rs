@@ -88,7 +88,7 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
     current_pos.0 -= 1;
     // Generate polygone of the outside of the map
     oob_polygons.push(Shape {
-        points: find_oob_polygone(current_pos, grid),
+        points: find_oob_polygone(current_pos, grid, (0, 1)),
         inner_if_true: true,
     });
     // find inside map polygones
@@ -104,7 +104,7 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
                         || grid[x][y - 1].tile_type == TileType::Floor)
                 {
                     oob_polygons.push(Shape {
-                        points: find_oob_polygone((x as i32, y as i32), grid),
+                        points: find_oob_polygone((x as i32, y as i32), grid, (0, -1)),
                         inner_if_true: true,
                     });
                     continue 'outer;
@@ -117,12 +117,16 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
     oob_polygons
 }
 
-fn find_oob_polygone(start_point: (i32, i32), grid: &mut Grid) -> Vec<(f32, f32)> {
+fn find_oob_polygone(
+    start_point: (i32, i32),
+    grid: &mut Grid,
+    start_dir: (i32, i32),
+) -> Vec<(f32, f32)> {
     let mut tile_polygone = Vec::new();
     let mut px_polygone: Vec<(f32, f32)> = Vec::new();
     let mut current_pos = start_point;
-    // We start by trying to go down
-    let mut dir = (0, 1);
+
+    let mut dir = start_dir;
     let mut next_dir = dir;
     // continue tracing until we come back where to the first corner
     while !tile_polygone.contains(&current_pos) {
