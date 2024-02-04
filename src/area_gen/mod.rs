@@ -18,6 +18,7 @@ pub struct AreaGenerationOutput {
     pub walkable_x: Vec<u32>,
     pub walkable_y: Vec<u32>,
     pub oob_polygons: Vec<Shape>, // bool is true when outer oob shape, false when inner
+    pub player_spawn_position: (i32, i32),
 }
 
 pub struct Shape {
@@ -41,7 +42,7 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     let map = maps.remove(map_index);
     let map_name = map.name.clone();
     // Generate map grid
-    let mut grid = generate_map(seed, map);
+    let (mut grid, player_spawn_position) = generate_map(seed, map);
 
     //------------------------------------------------------//
     //               Find oob polygons                      //
@@ -55,7 +56,10 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     let mut walkable_y = Vec::new();
     for x in 0..grid.len() {
         for y in 0..grid[0].len() {
-            if grid[x][y].tile_type == TileType::Floor {
+            if grid[x][y].tile_type == TileType::Floor
+                || grid[x][y].tile_type == TileType::Start
+                || grid[x][y].tile_type == TileType::Boss
+            {
                 walkable_x.push(x as u32);
                 walkable_y.push(y as u32);
             }
@@ -74,6 +78,7 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
         height: grid[0].len() as u32,
         walkable_x,
         walkable_y,
+        player_spawn_position,
     }
 }
 
@@ -89,7 +94,7 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
     // Generate polygone of the outside of the map
     oob_polygons.push(Shape {
         points: find_oob_polygone(current_pos, grid, (0, 1)),
-        inner_if_true: true,
+        inner_if_true: false,
     });
     // find inside map polygones
     // scan the grid and search for tiles that are not floor but next to floor, and not already scanned
@@ -266,13 +271,13 @@ fn find_oob_polygone(
 
     // for debuging only
     for point in tile_polygone {
-        grid[point.0 as usize][point.1 as usize].tile_type = TileType::Start;
+        grid[point.0 as usize][point.1 as usize].tile_type = TileType::Angle;
     }
 
     px_polygone
 }
 
-fn generate_map(seed: u64, map: Map) -> Grid {
+fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32)) {
     // The rng instance is created from the seed
     let mut rng: ChaCha8Rng = ChaCha8Rng::seed_from_u64(seed);
 
@@ -302,9 +307,25 @@ fn generate_map(seed: u64, map: Map) -> Grid {
     // resize_grid to it's minimum size
     resize_grid(&mut grid, 4);
 
+    let mut start_after_resize = (0, 0);
+    'outer: for x in 0..grid.len() {
+        for y in 0..grid[0].len() {
+            if grid[x][y].tile_type == TileType::Start {
+                start_after_resize = (x as i32, y as i32);
+                break 'outer;
+            }
+        }
+    }
+
     // // print grid
     // render_grid(&grid, map.name.clone());
-    grid
+    (
+        grid,
+        (
+            (start_after_resize.0 * TILE_SIZE) - (TILE_SIZE / 2),
+            (start_after_resize.1 * TILE_SIZE) - (TILE_SIZE / 2),
+        ),
+    )
 }
 
 fn resize_grid(grid: &mut Grid, border_size: usize) {
@@ -646,6 +667,7 @@ fn render_grid(grid: &Grid, file_name: String, show_outline: bool) {
                         TileType::Floor => image::Rgb([230u8, 213u8, 168u8]),
                         TileType::Wall => image::Rgb([122u8, 97u8, 31u8]),
                         TileType::Start => image::Rgb([182u8, 51u8, 214u8]),
+                        TileType::Angle => image::Rgb([182u8, 51u8, 214u8]),
                         TileType::Event => image::Rgb([181u8, 181u8, 181u8]),
                         TileType::Water => image::Rgb([51u8, 114u8, 214u8]),
                         TileType::Forest => image::Rgb([42u8, 117u8, 14u8]),

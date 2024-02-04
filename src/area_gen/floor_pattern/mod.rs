@@ -17,6 +17,7 @@ pub enum TileType {
     Event,
     Water,
     Forest,
+    Angle,
 }
 
 #[derive(PartialEq, Eq)]
