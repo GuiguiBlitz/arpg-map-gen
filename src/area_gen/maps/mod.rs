@@ -24,6 +24,7 @@ pub enum TileType {
 pub struct Tile {
     pub tile_type: TileType,
     pub scanned: bool,
+    pub walkable: bool,
 }
 
 #[derive(Clone)]

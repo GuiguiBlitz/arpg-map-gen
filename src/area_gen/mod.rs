@@ -1,12 +1,12 @@
 // Custom
-use floor_pattern::{FloorPattern, Map, Tile, TileType};
+use maps::{FloorPattern, Map, Tile, TileType};
 // RNG
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 // Image creation
 use image::ImageBuffer;
 
-mod floor_pattern;
+mod maps;
 
 type Grid = Vec<Vec<Tile>>;
 
@@ -33,10 +33,17 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // random seed
     let seed: u64 = rand::random();
 
-    let mut maps = floor_pattern::define_floor_patterns();
+    let mut maps = maps::define_floor_patterns();
     //------------------------------------------------------//
     //               Generate maps                          //
     //------------------------------------------------------//
+
+    //------------------------------------------------------//
+    //               Add mobs                               //
+    //------------------------------------------------------//
+
+    //  Store all rectange centers
+    // depending on a tile rectangle size threshold , place x mob pack on the rectangle.
 
     // Pick a map
     let map = maps.remove(map_index);
@@ -56,10 +63,7 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     let mut walkable_y = Vec::new();
     for x in 0..grid.len() {
         for y in 0..grid[0].len() {
-            if grid[x][y].tile_type == TileType::Floor
-                || grid[x][y].tile_type == TileType::Start
-                || grid[x][y].tile_type == TileType::Boss
-            {
+            if grid[x][y].walkable {
                 walkable_x.push(x as u32);
                 walkable_y.push(y as u32);
             }
@@ -86,7 +90,7 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
     // Find a first point on the map contour
     let mut oob_polygons = Vec::new();
     let mut current_pos = (0, (grid[0].len() / 2) as i32);
-    while grid[current_pos.0 as usize][current_pos.1 as usize].tile_type != TileType::Floor {
+    while !grid[current_pos.0 as usize][current_pos.1 as usize].walkable {
         current_pos.0 += 1;
     }
     // Take a step
@@ -102,13 +106,11 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
         for x in 1..grid.len() - 1 {
             for y in 1..grid[0].len() - 1 {
                 if !grid[x][y].scanned
-                    && grid[x][y].tile_type != TileType::Floor
-                    && grid[x][y].tile_type != TileType::Boss
-                    && grid[x][y].tile_type != TileType::Start
-                    && (grid[x + 1][y].tile_type == TileType::Floor
-                        || grid[x - 1][y].tile_type == TileType::Floor
-                        || grid[x][y + 1].tile_type == TileType::Floor
-                        || grid[x][y - 1].tile_type == TileType::Floor)
+                    && !grid[x][y].walkable
+                    && (grid[x + 1][y].walkable
+                        || grid[x - 1][y].walkable
+                        || grid[x][y + 1].walkable
+                        || grid[x][y - 1].walkable)
                 {
                     oob_polygons.push(Shape {
                         points: find_oob_polygone((x as i32, y as i32), grid, (0, -1)),
@@ -141,13 +143,9 @@ fn find_oob_polygone(
         // if current dir is down
         if dir == (0, 1) {
             // right is floor
-            if (grid[current_pos.0 as usize + 1][current_pos.1 as usize]).tile_type
-                == TileType::Floor
-            {
+            if (grid[current_pos.0 as usize + 1][current_pos.1 as usize]).walkable {
                 // down is floor
-                if grid[current_pos.0 as usize][current_pos.1 as usize + 1].tile_type
-                    == TileType::Floor
-                {
+                if grid[current_pos.0 as usize][current_pos.1 as usize + 1].walkable {
                     //found corner
                     tile_polygone.push(current_pos);
                     //keep bottom right point
@@ -173,13 +171,9 @@ fn find_oob_polygone(
         // if curent dir is left
         if dir == (-1, 0) {
             // bottom is floor
-            if (grid[current_pos.0 as usize][current_pos.1 as usize + 1]).tile_type
-                == TileType::Floor
-            {
+            if (grid[current_pos.0 as usize][current_pos.1 as usize + 1]).walkable {
                 // left is floor
-                if grid[current_pos.0 as usize - 1][current_pos.1 as usize].tile_type
-                    == TileType::Floor
-                {
+                if grid[current_pos.0 as usize - 1][current_pos.1 as usize].walkable {
                     //found corner
                     tile_polygone.push(current_pos);
                     //keep bottom left
@@ -204,13 +198,9 @@ fn find_oob_polygone(
         // if curent dir is right
         if dir == (1, 0) {
             // up is floor
-            if (grid[current_pos.0 as usize][current_pos.1 as usize - 1]).tile_type
-                == TileType::Floor
-            {
+            if (grid[current_pos.0 as usize][current_pos.1 as usize - 1]).walkable {
                 // right is floor
-                if grid[current_pos.0 as usize + 1][current_pos.1 as usize].tile_type
-                    == TileType::Floor
-                {
+                if grid[current_pos.0 as usize + 1][current_pos.1 as usize].walkable {
                     //found corner
                     tile_polygone.push(current_pos);
                     // keep up right point
@@ -235,13 +225,9 @@ fn find_oob_polygone(
         // if current dir is up
         if dir == (0, -1) {
             // left is floor
-            if (grid[current_pos.0 as usize - 1][current_pos.1 as usize]).tile_type
-                == TileType::Floor
-            {
+            if (grid[current_pos.0 as usize - 1][current_pos.1 as usize]).walkable {
                 // up is floor
-                if grid[current_pos.0 as usize][current_pos.1 as usize - 1].tile_type
-                    == TileType::Floor
-                {
+                if grid[current_pos.0 as usize][current_pos.1 as usize - 1].walkable {
                     //found corner
                     tile_polygone.push(current_pos);
                     // keep up left point
@@ -303,8 +289,8 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32)) {
     remove_small_cluster(&mut grid, oob_tiletype, 4, false, true);
 
     // add Start of map, first center and last center
-    draw_rectangle(&mut grid, TileType::Start, (2, 2), map_start);
-    draw_rectangle(&mut grid, TileType::Boss, (2, 2), center);
+    draw_rectangle(&mut grid, TileType::Start, (2, 2), map_start, true);
+    draw_rectangle(&mut grid, TileType::Boss, (2, 2), center, true);
 
     // resize_grid to it's minimum size
     resize_grid(&mut grid, 4);
@@ -336,7 +322,7 @@ fn resize_grid(grid: &mut Grid, border_size: usize) {
     let height = grid[0].len();
     'outer: loop {
         for y in 0..height {
-            if grid[border_size][y].tile_type == TileType::Floor {
+            if grid[border_size][y].walkable {
                 break 'outer;
             }
         }
@@ -347,7 +333,7 @@ fn resize_grid(grid: &mut Grid, border_size: usize) {
 
     'outer: loop {
         for y in 0..height {
-            if grid[x - border_size][y].tile_type == TileType::Floor {
+            if grid[x - border_size][y].walkable {
                 break 'outer;
             }
         }
@@ -359,7 +345,7 @@ fn resize_grid(grid: &mut Grid, border_size: usize) {
     let width = grid.len();
     'outer: loop {
         for x in 0..width {
-            if grid[x][y + border_size].tile_type == TileType::Floor {
+            if grid[x][y + border_size].walkable {
                 break 'outer;
             }
         }
@@ -375,7 +361,7 @@ fn resize_grid(grid: &mut Grid, border_size: usize) {
 
     'outer: loop {
         for x in 0..width {
-            if grid[x][y - border_size].tile_type == TileType::Floor {
+            if grid[x][y - border_size].walkable {
                 break 'outer;
             }
         }
@@ -414,19 +400,19 @@ fn remove_small_cluster(
                 let mut floor_left_at = 0;
                 let mut floor_right_at = 0;
                 for i in 1..cluster_size {
-                    if grid[x + i][y].tile_type == TileType::Floor {
+                    if grid[x + i][y].walkable {
                         is_floor_right = true;
                         floor_right_at = i;
                     }
-                    if grid[x - i][y].tile_type == TileType::Floor {
+                    if grid[x - i][y].walkable {
                         is_floor_left = true;
                         floor_left_at = i;
                     }
-                    if grid[x][y + i].tile_type == TileType::Floor {
+                    if grid[x][y + i].walkable {
                         is_floor_bottom = true;
                         floor_bottom_at = i;
                     }
-                    if grid[x][y - i].tile_type == TileType::Floor {
+                    if grid[x][y - i].walkable {
                         is_floor_up = true;
                         floor_up_at = i;
                     }
@@ -473,7 +459,7 @@ fn remove_small_cluster(
     }
     // after full scan, update tileset
     for tile in tiles_to_fill {
-        add_tile(grid, tile.0, tile.1, TileType::Floor);
+        add_tile(grid, tile.0, tile.1, TileType::Floor, true);
     }
 }
 fn generate_walkable_layout(
@@ -501,6 +487,7 @@ fn generate_walkable_layout(
             .round() as i32,
         ),
         start_center,
+        true,
     );
 
     let mut center: (i32, i32) = start_center;
@@ -534,6 +521,7 @@ fn generate_walkable_layout(
                     .round() as i32,
                 ),
                 center,
+                true,
             );
         }
     }
@@ -583,7 +571,13 @@ fn find_point_on_edge(
 //     chosen_direction
 // }
 
-fn draw_rectangle(grid: &mut Grid, tiletype: TileType, size: (i32, i32), center: (i32, i32)) {
+fn draw_rectangle(
+    grid: &mut Grid,
+    tiletype: TileType,
+    size: (i32, i32),
+    center: (i32, i32),
+    walkable: bool,
+) {
     for x in 0..size.0 {
         for y in 0..size.1 {
             add_tile(
@@ -591,6 +585,7 @@ fn draw_rectangle(grid: &mut Grid, tiletype: TileType, size: (i32, i32), center:
                 ((center.0 - (size.0 / 2)) + x) as usize,
                 ((center.1 - (size.1 / 2)) + y) as usize,
                 tiletype,
+                walkable,
             )
         }
     }
@@ -623,9 +618,10 @@ fn draw_rectangle(grid: &mut Grid, tiletype: TileType, size: (i32, i32), center:
 //     }
 // }
 
-fn add_tile(grid: &mut Grid, x: usize, y: usize, tile_type: TileType) {
+fn add_tile(grid: &mut Grid, x: usize, y: usize, tile_type: TileType, walkable: bool) {
     if x < grid.len() && y < grid.len() {
         grid[x][y].tile_type = tile_type;
+        grid[x][y].walkable = walkable;
     }
 }
 
@@ -637,6 +633,7 @@ fn init_grid(height: i32, width: i32, oob_tiletype: TileType) -> Grid {
             row.push(Tile {
                 tile_type: oob_tiletype,
                 scanned: false,
+                walkable: false,
             })
         }
         grid.push(row)
