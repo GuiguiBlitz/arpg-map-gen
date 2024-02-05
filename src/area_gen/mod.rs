@@ -29,9 +29,9 @@ pub struct Shape {
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // Create random generator from seed
     // fixed seed
-    let seed: u64 = 8863375687041853504;
+    // let seed: u64 = 13993395885069453555;
     // random seed
-    // let seed: u64 = rand::random();
+    let seed: u64 = rand::random();
 
     let mut maps = floor_pattern::define_floor_patterns();
     //------------------------------------------------------//
