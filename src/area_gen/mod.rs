@@ -6,11 +6,14 @@ use rand_chacha::ChaCha8Rng;
 // Image creation
 use image::ImageBuffer;
 
+use self::maps::MobPack;
+
 mod maps;
 
 type Grid = Vec<Vec<Tile>>;
 
 const TILE_SIZE: i32 = 60;
+// const MOB_SIZE: i32 = 20;
 
 pub struct AreaGenerationOutput {
     pub width: u32,
@@ -19,12 +22,17 @@ pub struct AreaGenerationOutput {
     pub walkable_y: Vec<u32>,
     pub oob_polygons: Vec<Shape>, // bool is true when outer oob shape, false when inner
     pub player_spawn_position: (i32, i32),
+    // pub ennemies: Vec<enemy>,
 }
 
 pub struct Shape {
     pub points: Vec<(f32, f32)>,
     pub inner_if_true: bool,
 }
+
+// pub struct Enemy {
+//     pub point: (f32, f32),
+// }
 
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // Create random generator from seed
@@ -38,18 +46,11 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     //               Generate maps                          //
     //------------------------------------------------------//
 
-    //------------------------------------------------------//
-    //               Add mobs                               //
-    //------------------------------------------------------//
-
-    //  Store all rectange centers
-    // depending on a tile rectangle size threshold , place x mob pack on the rectangle.
-
     // Pick a map
     let map = maps.remove(map_index);
     let map_name = map.name.clone();
     // Generate map grid
-    let (mut grid, player_spawn_position) = generate_map(seed, map);
+    let (mut grid, player_spawn_position, nb_packs) = generate_map(seed, map);
 
     //------------------------------------------------------//
     //               Find oob polygons                      //
@@ -70,11 +71,12 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
         }
     }
     println!(
-        "----------------------------\nSeed : {} \n    Biome : {}\n    Size  : {} x {} tiles",
+        "----------------------------\nSeed : {} \n    Biome : {}\n    Size  : {} x {} tiles\n    Packs : {}",
         seed,
         map_name,
         grid.len(),
-        grid[0].len()
+        grid[0].len(),
+        nb_packs
     );
     AreaGenerationOutput {
         oob_polygons,
@@ -265,7 +267,7 @@ fn find_oob_polygone(
     px_polygone
 }
 
-fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32)) {
+fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
     // The rng instance is created from the seed
     let mut rng: ChaCha8Rng = ChaCha8Rng::seed_from_u64(seed);
 
@@ -277,12 +279,14 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32)) {
     // genrate walkable paths based on a random selection of possible biomes
     let mut center = map.generation_init_center;
     let map_start = center;
-
+    let mut tmp_packs;
+    let mut nb_packs = 0;
+    // Add
     for i in 0..map.biomes.len() {
-        center =
+        (center, tmp_packs) =
             generate_walkable_layout(&mut grid, &map.biomes[i], &mut rng, oob_tiletype, center);
+        nb_packs += tmp_packs;
     }
-
     // remove small clusters of oob tiles
     remove_small_cluster(&mut grid, oob_tiletype, 4, false, true);
     remove_small_cluster(&mut grid, oob_tiletype, 4, true, false);
@@ -313,6 +317,7 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32)) {
             (start_after_resize.0 * TILE_SIZE) - (TILE_SIZE / 2),
             (start_after_resize.1 * TILE_SIZE) - (TILE_SIZE / 2),
         ),
+        nb_packs,
     )
 }
 
@@ -468,7 +473,7 @@ fn generate_walkable_layout(
     rng: &mut ChaCha8Rng,
     oob_tiletype: TileType,
     start_center: (i32, i32),
-) -> (i32, i32) {
+) -> ((i32, i32), i32) {
     draw_rectangle(
         grid,
         TileType::Floor,
@@ -490,6 +495,7 @@ fn generate_walkable_layout(
         true,
     );
 
+    let mut nb_packs = 0;
     let mut center: (i32, i32) = start_center;
     for _ in 0..rng.gen_range(
         biome.rng_range_number_of_direction_changes.0
@@ -523,9 +529,13 @@ fn generate_walkable_layout(
                 center,
                 true,
             );
+            // Add mob pack at the center of the square
+
+            grid[center.0 as usize][center.1 as usize].mob_pack = Some(MobPack {});
+            nb_packs += 1;
         }
     }
-    center
+    (center, nb_packs)
 }
 
 fn find_point_on_edge(
@@ -590,33 +600,6 @@ fn draw_rectangle(
         }
     }
 }
-// input taille, coordonees du centre
-
-// fn draw_circle(
-//     grid: &mut Grid,
-//     tiletype: TileType,
-//     inbound: bool,
-//     center: (f32, f32),
-//     radius: f32,
-// ) {
-//     let width = grid.len();
-//     let height = grid[0].len();
-
-//     // println!("Maps is {} wide and {} tall ", center_x, center_y);
-//     for x in 0..width {
-//         for y in 0..height {
-//             let dx = f32::abs(x as f32 - center.0);
-//             let dy = f32::abs(y as f32 - center.1);
-//             if dx * dx + dy * dy <= radius * radius {
-//                 if inbound {
-//                     add_tile(grid, x, y, tiletype)
-//                 }
-//             } else if !inbound {
-//                 add_tile(grid, x, y, tiletype)
-//             }
-//         }
-//     }
-// }
 
 fn add_tile(grid: &mut Grid, x: usize, y: usize, tile_type: TileType, walkable: bool) {
     if x < grid.len() && y < grid.len() {
@@ -634,6 +617,7 @@ fn init_grid(height: i32, width: i32, oob_tiletype: TileType) -> Grid {
                 tile_type: oob_tiletype,
                 scanned: false,
                 walkable: false,
+                mob_pack: None,
             })
         }
         grid.push(row)
@@ -656,6 +640,12 @@ fn render_grid(grid: &Grid, file_name: String, show_outline: bool) {
                     i.try_into().unwrap(),
                     j.try_into().unwrap(),
                     image::Rgb([252u8, 40u8, 40u8]),
+                )
+            } else if y.mob_pack.is_some() {
+                img.put_pixel(
+                    i.try_into().unwrap(),
+                    j.try_into().unwrap(),
+                    image::Rgb([252u8, 119u8, 3u8]),
                 )
             } else {
                 img.put_pixel(

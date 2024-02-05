@@ -19,12 +19,13 @@ pub enum TileType {
     Forest,
     Angle,
 }
+pub struct MobPack {}
 
-#[derive(PartialEq, Eq)]
 pub struct Tile {
     pub tile_type: TileType,
     pub scanned: bool,
     pub walkable: bool,
+    pub mob_pack: Option<MobPack>,
 }
 
 #[derive(Clone)]
