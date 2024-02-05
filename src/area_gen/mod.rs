@@ -29,9 +29,9 @@ pub struct Shape {
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // Create random generator from seed
     // fixed seed
-    // let seed: u64 = 142857;
+    let seed: u64 = 8863375687041853504;
     // random seed
-    let seed: u64 = rand::random();
+    // let seed: u64 = rand::random();
 
     let mut maps = floor_pattern::define_floor_patterns();
     //------------------------------------------------------//
@@ -103,6 +103,8 @@ fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
             for y in 1..grid[0].len() - 1 {
                 if !grid[x][y].scanned
                     && grid[x][y].tile_type != TileType::Floor
+                    && grid[x][y].tile_type != TileType::Boss
+                    && grid[x][y].tile_type != TileType::Start
                     && (grid[x + 1][y].tile_type == TileType::Floor
                         || grid[x - 1][y].tile_type == TileType::Floor
                         || grid[x][y + 1].tile_type == TileType::Floor
@@ -133,8 +135,9 @@ fn find_oob_polygone(
 
     let mut dir = start_dir;
     let mut next_dir = dir;
+    let mut first_polygone_first_point = (0, 0);
     // continue tracing until we come back where to the first corner
-    while !tile_polygone.contains(&current_pos) {
+    while current_pos != first_polygone_first_point {
         // if current dir is down
         if dir == (0, 1) {
             // right is floor
@@ -262,16 +265,15 @@ fn find_oob_polygone(
             }
         }
         dir = next_dir;
+        // store break condition
+        if tile_polygone.len() == 1 {
+            first_polygone_first_point = current_pos;
+        }
         // flag current point to avoid scanning this polygon again later
         grid[current_pos.0 as usize][current_pos.1 as usize].scanned = true;
         // move to next point
         current_pos.0 += dir.0;
         current_pos.1 += dir.1;
-    }
-
-    // for debuging only
-    for point in tile_polygone {
-        grid[point.0 as usize][point.1 as usize].tile_type = TileType::Angle;
     }
 
     px_polygone
