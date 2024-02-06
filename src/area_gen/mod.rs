@@ -37,9 +37,10 @@ pub struct Shape {
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // Create random generator from seed
     // fixed seed
-    // let seed: u64 = 13993395885069453555;
+    // let seed: u64 = ;
     // random seed
     let seed: u64 = rand::random();
+    println!("{}", seed);
 
     let mut maps = maps::define_floor_patterns();
     //------------------------------------------------------//
@@ -273,11 +274,13 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
 
     let oob_tiletype = map.oob_type;
 
+    let grid_size = 1500;
+
     // Initialize map grid from initial biome and oob tile type
-    let mut grid: Grid = init_grid(750, 750, oob_tiletype);
+    let mut grid: Grid = init_grid(grid_size, grid_size, oob_tiletype);
 
     // genrate walkable paths based on a random selection of possible biomes
-    let mut center = map.generation_init_center;
+    let mut center = (grid_size / 2, grid_size / 2);
     let map_start = center;
     let mut tmp_packs;
     let mut nb_packs = 0;
