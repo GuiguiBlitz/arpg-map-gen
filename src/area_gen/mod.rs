@@ -6,8 +6,6 @@ use rand_chacha::ChaCha8Rng;
 // Image creation
 use image::ImageBuffer;
 
-use self::maps::MobPack;
-
 mod maps;
 
 type Grid = Vec<Vec<Tile>>;
@@ -54,11 +52,18 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     let (mut grid, player_spawn_position, nb_packs) = generate_map(seed, map);
 
     //------------------------------------------------------//
+    //               Add mob packs                          //
+    //------------------------------------------------------//
+
+    // TODO
+
+    //------------------------------------------------------//
     //               Find oob polygons                      //
     //------------------------------------------------------//
     let oob_polygons = find_oob_polygons(&mut grid);
-    render_grid(&grid, map_name.clone() + "_outline", true);
     render_grid(&grid, map_name.clone(), false);
+
+    // render_grid(&grid, map_name.clone() + "_outline", true);
 
     // Initiate module outputf
     let mut walkable_x = Vec::new();
@@ -282,14 +287,13 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
     // genrate walkable paths based on a random selection of possible biomes
     let mut center = (grid_size / 2, grid_size / 2);
     let map_start = center;
-    let mut tmp_packs;
     let mut nb_packs = 0;
     // Add
     for i in 0..map.biomes.len() {
-        (center, tmp_packs) =
+        center =
             generate_walkable_layout(&mut grid, &map.biomes[i], &mut rng, oob_tiletype, center);
-        nb_packs += tmp_packs;
     }
+
     // remove small clusters of oob tiles
     remove_small_cluster(&mut grid, oob_tiletype, 4, false, true);
     remove_small_cluster(&mut grid, oob_tiletype, 4, true, false);
@@ -476,7 +480,7 @@ fn generate_walkable_layout(
     rng: &mut ChaCha8Rng,
     oob_tiletype: TileType,
     start_center: (i32, i32),
-) -> ((i32, i32), i32) {
+) -> (i32, i32) {
     draw_rectangle(
         grid,
         TileType::Floor,
@@ -498,7 +502,6 @@ fn generate_walkable_layout(
         true,
     );
 
-    let mut nb_packs = 0;
     let mut center: (i32, i32) = start_center;
     for _ in 0..rng.gen_range(
         biome.rng_range_number_of_direction_changes.0
@@ -533,12 +536,9 @@ fn generate_walkable_layout(
                 true,
             );
             // Add mob pack at the center of the square
-
-            grid[center.0 as usize][center.1 as usize].mob_pack = Some(MobPack {});
-            nb_packs += 1;
         }
     }
-    (center, nb_packs)
+    center
 }
 
 fn find_point_on_edge(
