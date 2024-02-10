@@ -11,7 +11,7 @@ mod maps;
 type Grid = Vec<Vec<Tile>>;
 
 const TILE_SIZE: i32 = 60;
-// const MOB_SIZE: i32 = 20;
+const MOB_SIZE: i32 = 20;
 
 pub struct AreaGenerationOutput {
     pub width: u32,
@@ -28,9 +28,15 @@ pub struct Shape {
     pub inner_if_true: bool,
 }
 
-// pub struct Enemy {
-//     pub point: (f32, f32),
-// }
+pub enum EnemyType {
+    Ranged,
+    Melee,
+}
+
+pub struct Enemy {
+    pub point: (u32, u32),
+    pub mob_type: EnemyType,
+}
 
 pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // Create random generator from seed
@@ -58,6 +64,12 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     render_grid(&grid, map_name.clone(), false);
 
     // render_grid(&grid, map_name.clone() + "_outline", true);
+
+    //------------------------------------------------------//
+    //               Generate mobs                          //
+    //------------------------------------------------------//
+
+    let enemies = generate_mobs(&grid);
 
     // Initiate module outputf
     let mut walkable_x = Vec::new();
@@ -88,6 +100,15 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     }
 }
 
+fn generate_mobs(grid: &Grid) -> Vec<Enemy> {
+    let mut mobs = Vec::new();
+    mobs.push(Enemy {
+        mob_type: EnemyType::Melee,
+        point: (0, 0),
+    });
+    mobs
+}
+
 fn add_mob_packs(grid: &mut Grid, start: (i32, i32), rng: &mut ChaCha8Rng, density: f64) -> i32 {
     let mut nb_walkable = 0;
 
@@ -100,12 +121,6 @@ fn add_mob_packs(grid: &mut Grid, start: (i32, i32), rng: &mut ChaCha8Rng, densi
     }
     let nb_packs = (density * nb_walkable as f64) as i32;
     let tiles_iter = nb_walkable / nb_packs;
-    println!(
-        "{} walkable, {} density, {} packs, 1 pack every {} tiles",
-        nb_walkable, density, nb_packs, tiles_iter
-    );
-
-    // let mut walkable_nodes :Vec<(i32,i32)>
     // Pas utiliser directement tiles_iter, mais le randomisser de 0 a tile_itter
     let mut iter = 0;
     let mut next_iter = tiles_iter;
@@ -116,10 +131,11 @@ fn add_mob_packs(grid: &mut Grid, start: (i32, i32), rng: &mut ChaCha8Rng, densi
             if tile.walkable
                 && iter >= next_iter
                 // No monsters next to map start
-                && (((x as f64 - start.0 as f64).abs() * (x as f64 - start.0 as f64).abs())
-                    + ((y as f64 - start.1 as f64).abs() * (y as f64 - start.1 as f64).abs()))
-                .sqrt()
-                  > 10.0
+                // && (((x as f64 - start.0 as f64).abs() * (x as f64 - start.0 as f64).abs())
+                //     + ((y as f64 - start.1 as f64).abs() * (y as f64 - start.1 as f64).abs()))
+                // .sqrt()
+                //   > 10.0
+                && tile.spawnable
                 // No monsters next to walls
                 && grid_copy[x+1][y].walkable
                 && grid_copy[x-1][y].walkable
@@ -340,8 +356,7 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
     let map_start = center;
     // Add
     for i in 0..map.biomes.len() {
-        center =
-            generate_walkable_layout(&mut grid, &map.biomes[i], &mut rng, oob_tiletype, center);
+        center = generate_walkable_layout(&mut grid, &map.biomes[i], &mut rng, center);
     }
 
     // remove small clusters of oob tiles
@@ -350,8 +365,8 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
     remove_small_cluster(&mut grid, oob_tiletype, 4, false, true);
 
     // add Start of map, first center and last center
-    draw_rectangle(&mut grid, TileType::Start, (2, 2), map_start, true);
-    draw_rectangle(&mut grid, TileType::Boss, (2, 2), center, true);
+    draw_rectangle(&mut grid, TileType::Start, (5, 5), map_start, true, false);
+    draw_rectangle(&mut grid, TileType::Boss, (1, 1), center, true, true);
 
     // resize_grid to it's minimum size
     resize_grid(&mut grid, 4);
@@ -366,9 +381,10 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
         }
     }
 
-    //------------------------------------------------------//
-    //               Add mob packs                          //
-    //------------------------------------------------------//
+    // add events on map, tag them as non spawnable
+    // TODO
+
+    // add mob packs
     let nb_packs = add_mob_packs(&mut grid, start_after_resize, &mut rng, map.density);
 
     // // print grid
@@ -526,14 +542,13 @@ fn remove_small_cluster(
     }
     // after full scan, update tileset
     for tile in tiles_to_fill {
-        add_tile(grid, tile.0, tile.1, TileType::Floor, true);
+        add_tile(grid, tile.0, tile.1, TileType::Floor, true, false);
     }
 }
 fn generate_walkable_layout(
     grid: &mut Grid,
     biome: &FloorPattern,
     rng: &mut ChaCha8Rng,
-    oob_tiletype: TileType,
     start_center: (i32, i32),
 ) -> (i32, i32) {
     draw_rectangle(
@@ -555,6 +570,7 @@ fn generate_walkable_layout(
         ),
         start_center,
         true,
+        true,
     );
 
     let mut center: (i32, i32) = start_center;
@@ -569,7 +585,7 @@ fn generate_walkable_layout(
             let direction: (i32, i32) =
                 biome.allowed_directions[rng.gen_range(0..biome.allowed_directions.len())];
 
-            center = find_point_on_edge(grid, center, oob_tiletype, direction);
+            center = find_point_on_edge(grid, center, direction);
             draw_rectangle(
                 grid,
                 TileType::Floor,
@@ -589,6 +605,7 @@ fn generate_walkable_layout(
                 ),
                 center,
                 true,
+                true,
             );
             // Add mob pack at the center of the square
         }
@@ -599,7 +616,6 @@ fn generate_walkable_layout(
 fn find_point_on_edge(
     grid: &Grid,
     previous_center: (i32, i32),
-    oob_tiletype: TileType,
     direction: (i32, i32),
 ) -> (i32, i32) {
     let mut current_position = previous_center;
@@ -609,8 +625,7 @@ fn find_point_on_edge(
         && (current_position.1 - 1) > 0
         && grid[(current_position.0 + direction.0) as usize]
             [(current_position.1 + direction.1) as usize]
-            .tile_type
-            != oob_tiletype
+            .walkable
     {
         current_position = (
             (current_position.0 + direction.0),
@@ -645,6 +660,7 @@ fn draw_rectangle(
     size: (i32, i32),
     center: (i32, i32),
     walkable: bool,
+    spawnable: bool,
 ) {
     for x in 0..size.0 {
         for y in 0..size.1 {
@@ -654,15 +670,24 @@ fn draw_rectangle(
                 ((center.1 - (size.1 / 2)) + y) as usize,
                 tiletype,
                 walkable,
+                spawnable,
             )
         }
     }
 }
 
-fn add_tile(grid: &mut Grid, x: usize, y: usize, tile_type: TileType, walkable: bool) {
+fn add_tile(
+    grid: &mut Grid,
+    x: usize,
+    y: usize,
+    tile_type: TileType,
+    walkable: bool,
+    spawnable: bool,
+) {
     if x < grid.len() && y < grid.len() {
         grid[x][y].tile_type = tile_type;
         grid[x][y].walkable = walkable;
+        grid[x][y].spawnable = spawnable;
     }
 }
 
@@ -676,6 +701,7 @@ fn init_grid(height: i32, width: i32, oob_tiletype: TileType) -> Grid {
                 scanned: false,
                 walkable: false,
                 mob_pack: None,
+                spawnable: false,
             })
         }
         grid.push(row)

@@ -27,6 +27,7 @@ pub struct Tile {
     pub tile_type: TileType,
     pub scanned: bool,
     pub walkable: bool,
+    pub spawnable: bool,
     pub mob_pack: Option<MobPack>,
 }
 
