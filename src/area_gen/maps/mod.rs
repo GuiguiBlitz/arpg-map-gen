@@ -20,7 +20,9 @@ pub enum TileType {
     Angle,
 }
 #[derive(Clone)]
-pub struct MobPack {}
+pub struct MobPack {
+    pub tile_coords: (usize, usize),
+}
 
 #[derive(Clone)]
 pub struct Tile {

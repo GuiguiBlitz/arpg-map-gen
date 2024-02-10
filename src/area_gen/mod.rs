@@ -6,6 +6,8 @@ use rand_chacha::ChaCha8Rng;
 // Image creation
 use image::ImageBuffer;
 
+use self::maps::MobPack;
+
 mod maps;
 
 type Grid = Vec<Vec<Tile>>;
@@ -20,7 +22,7 @@ pub struct AreaGenerationOutput {
     pub walkable_y: Vec<u32>,
     pub oob_polygons: Vec<Shape>, // bool is true when outer oob shape, false when inner
     pub player_spawn_position: (i32, i32),
-    // pub ennemies: Vec<enemy>,
+    pub enemies: Vec<Enemy>, // pub ennemies: Vec<enemy>,
 }
 
 pub struct Shape {
@@ -28,6 +30,7 @@ pub struct Shape {
     pub inner_if_true: bool,
 }
 
+#[derive(Clone)]
 pub enum EnemyType {
     Ranged,
     Melee,
@@ -44,6 +47,8 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     // let seed: u64 = ;
     // random seed
     let seed: u64 = rand::random();
+    // The rng instance is created from the seed
+    let mut rng: ChaCha8Rng = ChaCha8Rng::seed_from_u64(seed);
     println!("{}", seed);
 
     let mut maps = maps::define_floor_patterns();
@@ -55,7 +60,7 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     let map = maps.remove(map_index);
     let map_name = map.name.clone();
     // Generate map grid
-    let (mut grid, player_spawn_position, nb_packs) = generate_map(seed, map);
+    let (mut grid, player_spawn_position, packs) = generate_map(&mut rng, map);
 
     //------------------------------------------------------//
     //               Find oob polygons                      //
@@ -69,7 +74,7 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     //               Generate mobs                          //
     //------------------------------------------------------//
 
-    let enemies = generate_mobs(&grid);
+    let enemies = generate_mobs(&packs, &mut rng);
 
     // Initiate module outputf
     let mut walkable_x = Vec::new();
@@ -83,12 +88,13 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
         }
     }
     println!(
-        "----------------------------\nSeed : {} \n    Biome : {}\n    Size  : {} x {} tiles\n    Packs : {}",
+        "----------------------------\nSeed : {} \n    Biome : {}\n    Size  : {} x {} tiles\n    Packs : {} \n    Monsters : {}",
         seed,
         map_name,
         grid.len(),
         grid[0].len(),
-        nb_packs
+        packs.len(),
+        enemies.len(),
     );
     AreaGenerationOutput {
         oob_polygons,
@@ -97,21 +103,62 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
         walkable_x,
         walkable_y,
         player_spawn_position,
+        enemies,
     }
 }
 
-fn generate_mobs(grid: &Grid) -> Vec<Enemy> {
+fn generate_mobs(packs: &Vec<MobPack>, rng: &mut ChaCha8Rng) -> Vec<Enemy> {
     let mut mobs = Vec::new();
-    mobs.push(Enemy {
-        mob_type: EnemyType::Melee,
-        point: (0, 0),
-    });
+    let max_mobs_per_pack = (TILE_SIZE / MOB_SIZE) * (TILE_SIZE / MOB_SIZE);
+    let tile_size = TILE_SIZE as usize;
+    let mob_size = MOB_SIZE as usize;
+    for pack in packs {
+        let mut x_offset = 0;
+        let mut y_offset = 0;
+        let nb_monsters = rng.gen_range(0..max_mobs_per_pack);
+        for _ in 0..=nb_monsters {
+            if (pack.tile_coords.0 * tile_size) + x_offset + mob_size
+                <= (pack.tile_coords.0 + 1) * tile_size
+            {
+                x_offset += mob_size;
+            } else {
+                x_offset = 0;
+                y_offset += mob_size;
+            }
+            let mob_coord_x = (pack.tile_coords.0 * tile_size) + x_offset + (mob_size / 2);
+            let mob_coord_y = (pack.tile_coords.1 * tile_size) + y_offset + (mob_size / 2);
+
+            let mob_type = match rng.gen_range(0u8..=1u8) {
+                0 => EnemyType::Melee,
+                1 => EnemyType::Ranged,
+                _ => EnemyType::Melee,
+            };
+            mobs.push(Enemy {
+                mob_type: mob_type.clone(),
+                point: (mob_coord_x as u32, mob_coord_y as u32),
+            });
+            // debug monster position
+            // println!(
+            //     "tile:{} {}, {} monsters, mob_coords: {} {}, type: {}",
+            //     pack.tile_coords.0,
+            //     pack.tile_coords.1,
+            //     nb_monsters + 1,
+            //     mob_coord_x,
+            //     mob_coord_y,
+            //     match mob_type {
+            //         EnemyType::Melee => "Melee",
+            //         EnemyType::Ranged => "Ranged",
+            //     }
+            // );
+        }
+    }
+
     mobs
 }
 
-fn add_mob_packs(grid: &mut Grid, start: (i32, i32), rng: &mut ChaCha8Rng, density: f64) -> i32 {
+fn add_mob_packs(grid: &mut Grid, rng: &mut ChaCha8Rng, density: f64) -> Vec<MobPack> {
     let mut nb_walkable = 0;
-
+    let mut packs = Vec::new();
     for row in grid.iter_mut() {
         for tile in row {
             if tile.walkable {
@@ -124,17 +171,11 @@ fn add_mob_packs(grid: &mut Grid, start: (i32, i32), rng: &mut ChaCha8Rng, densi
     // Pas utiliser directement tiles_iter, mais le randomisser de 0 a tile_itter
     let mut iter = 0;
     let mut next_iter = tiles_iter;
-    let mut actual_nb_packs = 0;
     let grid_copy = grid.to_vec();
     for (x, row) in grid.iter_mut().enumerate() {
         for (y, tile) in row.iter_mut().enumerate() {
             if tile.walkable
                 && iter >= next_iter
-                // No monsters next to map start
-                // && (((x as f64 - start.0 as f64).abs() * (x as f64 - start.0 as f64).abs())
-                //     + ((y as f64 - start.1 as f64).abs() * (y as f64 - start.1 as f64).abs()))
-                // .sqrt()
-                //   > 10.0
                 && tile.spawnable
                 // No monsters next to walls
                 && grid_copy[x+1][y].walkable
@@ -142,10 +183,15 @@ fn add_mob_packs(grid: &mut Grid, start: (i32, i32), rng: &mut ChaCha8Rng, densi
                 && grid_copy[x][y+1].walkable
                 && grid_copy[x][y-1].walkable
             {
-                tile.mob_pack = Some(maps::MobPack {});
+                tile.mob_pack = Some(maps::MobPack {
+                    tile_coords: (x, y),
+                });
+                packs.push(maps::MobPack {
+                    tile_coords: (x, y),
+                });
+
                 iter = 0;
                 next_iter = rng.gen_range((tiles_iter as f64 * 0.7) as i32..tiles_iter);
-                actual_nb_packs += 1;
             }
             if tile.walkable {
                 iter += 1;
@@ -158,7 +204,7 @@ fn add_mob_packs(grid: &mut Grid, start: (i32, i32), rng: &mut ChaCha8Rng, densi
             tile.scanned = false;
         }
     }
-    actual_nb_packs
+    packs
 }
 
 fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
@@ -340,10 +386,7 @@ fn find_oob_polygone(
     px_polygone
 }
 
-fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
-    // The rng instance is created from the seed
-    let mut rng: ChaCha8Rng = ChaCha8Rng::seed_from_u64(seed);
-
+fn generate_map(rng: &mut ChaCha8Rng, map: Map) -> (Grid, (i32, i32), Vec<MobPack>) {
     let oob_tiletype = map.oob_type;
 
     let grid_size = 1500;
@@ -356,7 +399,7 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
     let map_start = center;
     // Add
     for i in 0..map.biomes.len() {
-        center = generate_walkable_layout(&mut grid, &map.biomes[i], &mut rng, center);
+        center = generate_walkable_layout(&mut grid, &map.biomes[i], rng, center);
     }
 
     // remove small clusters of oob tiles
@@ -385,7 +428,7 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
     // TODO
 
     // add mob packs
-    let nb_packs = add_mob_packs(&mut grid, start_after_resize, &mut rng, map.density);
+    let mob_packs = add_mob_packs(&mut grid, rng, map.density);
 
     // // print grid
     // render_grid(&grid, map.name.clone());
@@ -395,7 +438,7 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
             (start_after_resize.0 * TILE_SIZE) - (TILE_SIZE / 2),
             (start_after_resize.1 * TILE_SIZE) - (TILE_SIZE / 2),
         ),
-        nb_packs,
+        mob_packs,
     )
 }
 
