@@ -19,8 +19,10 @@ pub enum TileType {
     Forest,
     Angle,
 }
+#[derive(Clone)]
 pub struct MobPack {}
 
+#[derive(Clone)]
 pub struct Tile {
     pub tile_type: TileType,
     pub scanned: bool,
@@ -33,6 +35,7 @@ pub struct Map {
     pub name: String,
     pub oob_type: TileType,
     pub biomes: Vec<FloorPattern>,
+    pub density: f64,
 }
 pub fn define_floor_patterns() -> Vec<Map> {
     //------------------------------------------------------//
@@ -109,6 +112,7 @@ pub fn define_floor_patterns() -> Vec<Map> {
             name: String::from("Island"),
             oob_type: TileType::Water,
             biomes: vec![many_tiny_all_dir.clone(), small_all_dir.clone()],
+            density: 0.02,
         },
         Map {
             name: String::from("Ledge"),
@@ -117,11 +121,13 @@ pub fn define_floor_patterns() -> Vec<Map> {
                 long_path_bottom_right_dir.clone(),
                 long_path_bottom_right_dir.clone(),
             ],
+            density: 0.1,
         },
         Map {
             name: String::from("Desert"),
             oob_type: TileType::Wall,
             biomes: vec![long_path_bottom_right_dir.clone(), large_all_dir.clone()],
+            density: 0.008,
         },
         Map {
             name: String::from("Forest"),
@@ -131,6 +137,7 @@ pub fn define_floor_patterns() -> Vec<Map> {
                 small_cross_dir.clone(),
                 small_cross_dir.clone(),
             ],
+            density: 0.01,
         },
         Map {
             name: String::from("Quarry"),
@@ -141,6 +148,7 @@ pub fn define_floor_patterns() -> Vec<Map> {
                 many_tiny_all_dir.clone(),
                 short_path_bottom_right_dir.clone(),
             ],
+            density: 0.01,
         },
     ];
     maps

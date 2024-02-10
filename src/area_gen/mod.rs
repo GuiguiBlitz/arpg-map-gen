@@ -52,12 +52,6 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
     let (mut grid, player_spawn_position, nb_packs) = generate_map(seed, map);
 
     //------------------------------------------------------//
-    //               Add mob packs                          //
-    //------------------------------------------------------//
-
-    // TODO
-
-    //------------------------------------------------------//
     //               Find oob polygons                      //
     //------------------------------------------------------//
     let oob_polygons = find_oob_polygons(&mut grid);
@@ -92,6 +86,63 @@ pub fn generate_area(map_index: usize) -> AreaGenerationOutput {
         walkable_y,
         player_spawn_position,
     }
+}
+
+fn add_mob_packs(grid: &mut Grid, start: (i32, i32), rng: &mut ChaCha8Rng, density: f64) -> i32 {
+    let mut nb_walkable = 0;
+
+    for row in grid.iter_mut() {
+        for tile in row {
+            if tile.walkable {
+                nb_walkable += 1;
+            }
+        }
+    }
+    let nb_packs = (density * nb_walkable as f64) as i32;
+    let tiles_iter = nb_walkable / nb_packs;
+    println!(
+        "{} walkable, {} density, {} packs, 1 pack every {} tiles",
+        nb_walkable, density, nb_packs, tiles_iter
+    );
+
+    // let mut walkable_nodes :Vec<(i32,i32)>
+    // Pas utiliser directement tiles_iter, mais le randomisser de 0 a tile_itter
+    let mut iter = 0;
+    let mut next_iter = tiles_iter;
+    let mut actual_nb_packs = 0;
+    let grid_copy = grid.to_vec();
+    for (x, row) in grid.iter_mut().enumerate() {
+        for (y, tile) in row.iter_mut().enumerate() {
+            if tile.walkable
+                && iter >= next_iter
+                // No monsters next to map start
+                && (((x as f64 - start.0 as f64).abs() * (x as f64 - start.0 as f64).abs())
+                    + ((y as f64 - start.1 as f64).abs() * (y as f64 - start.1 as f64).abs()))
+                .sqrt()
+                  > 10.0
+                // No monsters next to walls
+                && grid_copy[x+1][y].walkable
+                && grid_copy[x-1][y].walkable
+                && grid_copy[x][y+1].walkable
+                && grid_copy[x][y-1].walkable
+            {
+                tile.mob_pack = Some(maps::MobPack {});
+                iter = 0;
+                next_iter = rng.gen_range((tiles_iter as f64 * 0.7) as i32..tiles_iter);
+                actual_nb_packs += 1;
+            }
+            if tile.walkable {
+                iter += 1;
+            }
+        }
+    }
+    // reset scanned tracker
+    for row in grid.iter_mut() {
+        for tile in row {
+            tile.scanned = false;
+        }
+    }
+    actual_nb_packs
 }
 
 fn find_oob_polygons(grid: &mut Grid) -> Vec<Shape> {
@@ -287,7 +338,6 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
     // genrate walkable paths based on a random selection of possible biomes
     let mut center = (grid_size / 2, grid_size / 2);
     let map_start = center;
-    let mut nb_packs = 0;
     // Add
     for i in 0..map.biomes.len() {
         center =
@@ -315,6 +365,11 @@ fn generate_map(seed: u64, map: Map) -> (Grid, (i32, i32), i32) {
             }
         }
     }
+
+    //------------------------------------------------------//
+    //               Add mob packs                          //
+    //------------------------------------------------------//
+    let nb_packs = add_mob_packs(&mut grid, start_after_resize, &mut rng, map.density);
 
     // // print grid
     // render_grid(&grid, map.name.clone());
